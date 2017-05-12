@@ -3,19 +3,20 @@ AM_CPPFLAGS = \
 	$(CB_CFLAGS) \
 	-include $(CONFIG_HEADER) \
 	-DDATADIR=\"$(datadir)\" \
-	-DPKGDATADIR=\"$(pkgdatadir)\"
+	-DPKGDATADIR=\"$(pkgdatadir)\" \
+	-DG_LOG_DOMAIN=\"corebird\"
 
 
 AM_VALAFLAGS = \
 	--thread \
 	--enable-deprecated \
 	--enable-checking \
-	--enable-experimental \
 	--vapidir $(builddir) \
 	--vapidir $(top_srcdir)/vapi \
 	--basedir $(srcdir) \
 	--directory $(builddir) \
 	--gresources $(top_srcdir)/corebird.gresource.xml \
+	-D G_LOG_DOMAIN=\"corebird\" \
 	$(top_srcdir)/vapi/config.vapi \
 	$(top_srcdir)/vapi/corebird-internal.vapi \
 	-C \
@@ -37,12 +38,9 @@ libcorebird_la_VALASOURCES = \
 	MentionsTimeline.vala \
 	SearchPage.vala \
 	DMPage.vala \
-	DeltaUpdater.vala \
-	ITwitterItem.vala \
 	UserStream.vala \
 	IMessageReceiver.vala \
 	IPage.vala \
-	UserCounter.vala \
 	DefaultTimeline.vala \
 	DMThreadsPage.vala \
 	Settings.vala \
@@ -53,7 +51,6 @@ libcorebird_la_VALASOURCES = \
 	ListStatusesPage.vala \
 	ListsPage.vala \
 	FavoritesTimeline.vala \
-	Filter.vala \
 	FilterPage.vala \
 	UserEventReceiver.vala \
 	SnippetManager.vala \
@@ -74,7 +71,6 @@ libcorebird_la_VALASOURCES = \
 	widgets/MultiMediaWidget.vala \
 	widgets/AvatarWidget.vala \
 	widgets/AvatarBannerWidget.vala \
-	widgets/MediaImageWidget.vala \
 	widgets/MediaVideoWidget.vala \
 	widgets/CropWidget.vala \
 	widgets/AddImageButton.vala \
@@ -89,9 +85,7 @@ libcorebird_la_VALASOURCES = \
 	util/Utils.vala \
 	util/BundleHistory.vala \
 	util/UserCompletion.vala \
-	util/WeakRef.vala \
 	util/Dirs.vala \
-	util/Bundle.vala \
 	util/UserUtils.vala \
 	list/TweetListEntry.vala \
 	list/DMListEntry.vala \
@@ -104,6 +98,8 @@ libcorebird_la_VALASOURCES = \
 	list/UserFilterEntry.vala \
 	list/AddListEntry.vala \
 	list/SnippetListEntry.vala \
+	list/FavImageRow.vala \
+	util/Benchmark.vala \
 	window/ComposeTweetWindow.vala \
 	window/SettingsDialog.vala \
 	window/UserListDialog.vala \
@@ -111,16 +107,13 @@ libcorebird_la_VALASOURCES = \
 	window/AboutDialog.vala \
 	window/AccountDialog.vala \
 	window/MediaDialog.vala \
-	window/ImageCropDialog.vala \
 	window/ModifySnippetDialog.vala \
-	window/FileSelector.vala \
 	sql/Database.vala \
 	sql/InsertStatement.vala \
 	sql/UpdateStatement.vala \
 	sql/SelectStatement.vala \
 	async/Collect.vala \
 	async/ComposeJob.vala \
-	model/TweetModel.vala \
 	model/DMThreadsModel.vala
 
 nodist_libcorebird_la_SOURCES = \
@@ -132,16 +125,34 @@ $(libcorebird_la_VALASOURCES:.vala=.c): libcorebird_la_vala.stamp
 
 
 libcorebird_la_SOURCES = \
-	Media.c \
-	Media.h \
-	MediaDownloader.c \
-	MediaDownloader.h \
-	Types.c \
-	Types.h \
-	TextTransform.c \
-	TextTransform.h \
+	CbMedia.c \
+	CbMedia.h \
+	CbMediaDownloader.c \
+	CbMediaDownloader.h \
+	CbTypes.c \
+	CbTypes.h \
+	CbTextTransform.c \
+	CbTextTransform.h \
 	CbTweet.c \
-	CbTweet.h
+	CbTweet.h \
+	CbFilter.c \
+	CbFilter.h \
+	CbAvatarCache.c \
+	CbAvatarCache.h \
+	CbUserCounter.c \
+	CbUserCounter.h \
+	CbMediaImageWidget.h \
+	CbMediaImageWidget.c \
+	CbTweetModel.h \
+	CbTweetModel.c \
+	CbTwitterItem.h \
+	CbTwitterItem.c \
+	CbDeltaUpdater.h \
+	CbDeltaUpdater.c \
+	CbUtils.h \
+	CbUtils.c \
+	CbBundle.h \
+	CbBundle.c
 
 libcorebird_la_vala.stamp: $(libcorebird_la_VALASOURCES) Makefile
 	@$(VALAC) \

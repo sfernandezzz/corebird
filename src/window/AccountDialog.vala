@@ -14,8 +14,9 @@
  *  You should have received a copy of the GNU General Public License
  *  along with corebird.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 [GtkTemplate (ui = "/org/baedert/corebird/ui/account-dialog.ui")]
-class AccountDialog : Gtk.Dialog {
+public class AccountDialog : Gtk.Window {
   private const string PAGE_NORMAL = "normal";
   private const string PAGE_DELETE = "delete";
   [GtkChild]
@@ -30,6 +31,16 @@ class AccountDialog : Gtk.Dialog {
   private Gtk.Entry website_entry;
   [GtkChild]
   private CompletionTextView description_text_view;
+  [GtkChild]
+  private CropWidget crop_widget;
+  [GtkChild]
+  private Gtk.Stack content_stack;
+  [GtkChild]
+  private Gtk.Box info_box;
+  [GtkChild]
+  private Gtk.Label error_label;
+  [GtkChild]
+  private Gtk.Button save_button;
 
   private unowned Account account;
   private string old_user_name;
@@ -38,11 +49,11 @@ class AccountDialog : Gtk.Dialog {
   private Gdk.Pixbuf? new_avatar = null;
   private Gdk.Pixbuf? new_banner = null;
 
+  private int old_width = 0;
+  private int old_height = 0;
 
 
   public AccountDialog (Account account) {
-    GLib.Object (use_header_bar: Gtk.Settings.get_default ().gtk_dialogs_use_header ? 1 : 0);
-    set_default_response (Gtk.ResponseType.CLOSE);
     this.account = account;
     name_entry.text = account.name;
     avatar_banner_widget.set_account (account);
@@ -73,6 +84,16 @@ class AccountDialog : Gtk.Dialog {
         set_transient_data (account.website, account.description);
       });
     }
+
+    Gtk.AccelGroup ag = new Gtk.AccelGroup ();
+    ag.connect (Gdk.Key.Escape, 0, Gtk.AccelFlags.LOCKED, escape_pressed_cb);
+
+    this.add_accel_group (ag);
+  }
+
+  private bool escape_pressed_cb () {
+    this.destroy ();
+    return Gdk.EVENT_STOP;
   }
 
   private void set_transient_data (string? website, string? description) {
@@ -81,15 +102,6 @@ class AccountDialog : Gtk.Dialog {
     old_website = account.website ?? "";
     old_description = account.description ?? "";
     description_text_view.get_buffer ().set_text (account.description ?? "");
-  }
-
-  public override void response (int response_id) {
-    if (response_id == Gtk.ResponseType.CLOSE) {
-      save_data ();
-      this.destroy ();
-    } else if (response_id == Gtk.ResponseType.CANCEL) {
-      this.destroy ();
-    }
   }
 
   [GtkCallback]
@@ -153,6 +165,7 @@ class AccountDialog : Gtk.Dialog {
       call.invoke_async.begin (null, (obj, res) => {
         try {
           call.invoke_async.end (res);
+          debug ("Avatar successfully updated");
         } catch (GLib.Error e) {
           Utils.show_error_object (call.get_payload (), "Could not update your avatar",
                                    GLib.Log.LINE, GLib.Log.FILE, this);
@@ -185,8 +198,9 @@ class AccountDialog : Gtk.Dialog {
       call.invoke_async.begin (null, (obj, res) => {
         try {
           call.invoke_async.end (res);
+          debug ("Banner succesfully updated");
         } catch (GLib.Error e) {
-          Utils.show_error_object (call.get_payload (), "Could not update your avatar",
+          Utils.show_error_object (call.get_payload (), "Could not update your banner",
                                    GLib.Log.LINE, GLib.Log.FILE, this);
         }
       });
@@ -290,6 +304,131 @@ class AccountDialog : Gtk.Dialog {
         }
       }
       Settings.get ().set_strv ("startup-accounts", new_startup_accounts);
+    }
+  }
+
+  private void show_crop_image_selector () {
+    var filechooser = new Gtk.FileChooserDialog (_("Select Banner Image"),
+                                                 this,
+                                                 Gtk.FileChooserAction.OPEN,
+                                                 _("Cancel"),
+                                                 Gtk.ResponseType.CANCEL,
+                                                 _("Open"),
+                                                 Gtk.ResponseType.ACCEPT);
+    filechooser.select_multiple = false;
+    filechooser.modal = true;
+
+    filechooser.response.connect ((id) => {
+      if (id == Gtk.ResponseType.ACCEPT) {
+        string selected_file = filechooser.get_filename ();
+        Gdk.Pixbuf? image = null;
+        try {
+          image = new Gdk.Pixbuf.from_file (selected_file);
+        } catch (GLib.Error e) {
+          warning (e.message);
+          return;
+        }
+
+        /* Values for banner */
+        int min_width = 200;
+        int min_height = 100;
+
+        if (crop_widget.desired_aspect_ratio == 1.0) {
+          /* Avatar */
+          min_width = 48;
+          min_height = 48;
+        }
+
+        if (image.get_width () >= min_width &&
+            image.get_height () >= min_height) {
+          crop_widget.set_image (image);
+          save_button.sensitive = true;
+        } else {
+          string error_str = "";
+          error_str += _("Image does not meet minimum size requirements:") + "\n";
+          error_str += ngettext ("Minimum width: %d pixel", "Minimum width: %d pixels", min_width)
+                       .printf (min_width) + "\n";
+          error_str += ngettext ("Minimum height: %d pixel", "Minimum height: %d pixels", min_height)
+                       .printf (min_height);
+          error_label.label = error_str;
+          content_stack.visible_child = error_label;
+          save_button.sensitive = false;
+        }
+      } else {
+        content_stack.visible_child = info_box;
+      }
+      filechooser.destroy ();
+    });
+
+    var filter = new Gtk.FileFilter ();
+    filter.add_mime_type ("image/png");
+    filter.add_mime_type ("image/jpeg");
+    filechooser.set_filter (filter);
+
+    filechooser.show_all ();
+  }
+
+  [GtkCallback]
+  private void avatar_clicked_cb () {
+    this.get_size (out old_width, out old_height);
+    this.resize (400, 400);
+    crop_widget.set_image (null);
+    crop_widget.set_size_request (-1, 400);
+    crop_widget.desired_aspect_ratio = 1.0;
+    crop_widget.set_min_size (48);
+    content_stack.visible_child = crop_widget;
+    show_crop_image_selector ();
+    save_button.label = _("Pick");
+  }
+
+  [GtkCallback]
+  private void banner_clicked_cb () {
+    this.get_size (out old_width, out old_height);
+    this.resize (700, 350);
+    crop_widget.set_size_request (700, 350);
+    crop_widget.set_image (null);
+    crop_widget.desired_aspect_ratio = 2.0;
+    crop_widget.set_min_size (200);
+    content_stack.visible_child = crop_widget;
+    show_crop_image_selector ();
+    save_button.label = _("Pick");
+  }
+
+  [GtkCallback]
+  private void cancel_button_clicked_cb () {
+    if (content_stack.visible_child == crop_widget ||
+        content_stack.visible_child == error_label) {
+      this.resize (old_width, old_height);
+      old_width = 0;
+      old_height = 0;
+      /* Just go back */
+      content_stack.visible_child = info_box;
+      save_button.label = _("Save");
+    } else {
+      this.destroy ();
+    }
+  }
+
+  [GtkCallback]
+  private void save_button_clicked_cb () {
+    if (content_stack.visible_child == crop_widget) {
+      Gdk.Pixbuf new_pixbuf = crop_widget.get_cropped_image ();
+      if (crop_widget.desired_aspect_ratio == 1.0) {
+        /* Avatar */
+        avatar_banner_widget.set_avatar (new_pixbuf);
+        new_avatar = new_pixbuf;
+      } else if (crop_widget.desired_aspect_ratio == 2.0) {
+        /* Banner */
+        avatar_banner_widget.set_banner (new_pixbuf);
+        new_banner = new_pixbuf;
+      } else {
+        GLib.assert_not_reached ();
+      }
+      save_button.label = _("Save");
+      content_stack.visible_child = info_box;
+    } else {
+      save_data ();
+      this.destroy ();
     }
   }
 }

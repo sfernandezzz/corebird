@@ -19,7 +19,7 @@
 public class MainWindow : Gtk.ApplicationWindow {
   private const GLib.ActionEntry[] win_entries = {
     {"compose-tweet",       show_hide_compose_window},
-    {"toggle-sidebar",      Settings.toggle_sidebar_visible},
+    {"toggle-topbar",       Settings.toggle_topbar_visible},
     {"switch-page",         simple_switch_page, "i"},
     {"show-account-dialog", show_account_dialog},
     {"show-account-list",   show_account_list},
@@ -53,6 +53,7 @@ public class MainWindow : Gtk.ApplicationWindow {
   public MainWidget main_widget;
   public unowned Account? account;
   private ComposeTweetWindow? compose_tweet_window = null;
+  private Gtk.GestureMultiPress thumb_button_gesture;
 
   public int cur_page_id {
     get {
@@ -61,7 +62,10 @@ public class MainWindow : Gtk.ApplicationWindow {
   }
 
   public MainWindow (Gtk.Application app, Account? account = null) {
-    set_default_size (480, 700);
+    set_default_size (530, 700);
+
+    var group = new Gtk.WindowGroup ();
+    group.add_window (this);
 
 #if DEBUG
     this.set_focus.connect ((w) => {
@@ -133,6 +137,11 @@ public class MainWindow : Gtk.ApplicationWindow {
       return false;
     });
 
+    this.thumb_button_gesture = new Gtk.GestureMultiPress (this);
+    thumb_button_gesture.set_button (0);
+    thumb_button_gesture.set_propagation_phase (Gtk.PropagationPhase.CAPTURE);
+    thumb_button_gesture.pressed.connect (thumb_button_pressed_cb);
+
     load_geometry ();
   }
 
@@ -173,7 +182,7 @@ public class MainWindow : Gtk.ApplicationWindow {
       this.set_window_title (main_widget.get_page (0).get_title ());
       avatar_image.surface = account.avatar_small;
       account.notify["avatar-small"].connect(() => {
-        avatar_image.surface = account.avatar_small;
+        avatar_image.surface = this.account.avatar_small;
       });
 
       account.info_changed.connect (account_info_changed);
@@ -238,13 +247,18 @@ public class MainWindow : Gtk.ApplicationWindow {
     int64 user_id = e.user_id;
     Corebird cb = (Corebird)this.get_application ();
 
+    MainWindow? account_window = null;
     if (user_id == this.account.id ||
-        cb.is_window_open_for_user_id (user_id)) {
+        cb.is_window_open_for_user_id (user_id, out account_window)) {
 #if GTK322
       account_popover.popdown ();
 #else
       account_popover.hide ();
 #endif
+
+      if (account_window != null)
+        account_window.present ();
+
       return;
     }
 
@@ -260,19 +274,20 @@ public class MainWindow : Gtk.ApplicationWindow {
       warning ("account == null");
   }
 
-
-  [GtkCallback]
-  private bool button_press_event_cb (Gdk.EventButton evt) {
-    if (evt.button == 9) {
+  private void thumb_button_pressed_cb (Gtk.GestureMultiPress gesture,
+                                        int                   n_press,
+                                        double                x,
+                                        double                y) {
+    uint button = gesture.get_current_button ();
+    if (button == 9) {
       // Forward thumb button
       main_widget.switch_page (Page.NEXT);
-      return Gdk.EVENT_STOP;
-    } else if (evt.button == 8) {
+      gesture.set_state (Gtk.EventSequenceState.CLAIMED);
+    } else if (button == 8) {
       // backward thumb button
       main_widget.switch_page (Page.PREVIOUS);
-      return Gdk.EVENT_STOP;
+      gesture.set_state (Gtk.EventSequenceState.CLAIMED);
     }
-    return Gdk.EVENT_PROPAGATE;
   }
 
   private void show_hide_compose_window () {
@@ -493,5 +508,39 @@ public class MainWindow : Gtk.ApplicationWindow {
     this.title_stack.transition_type = transition_type;
     this.title_label.label = title;
     this.title_stack.visible_child = title_label;
+  }
+
+  public void reply_to_tweet (int64 tweet_id) {
+    Cb.Tweet? tweet = null;
+    tweet = ((DefaultTimeline)this.main_widget.get_page(Page.STREAM)).tweet_list.model.get_for_id (tweet_id,
+                                                                                                   0);
+    if (tweet == null) {
+      warning ("tweet with id %s could not be found", tweet_id.to_string ());
+      return;
+    }
+
+    var ctw = new ComposeTweetWindow (this, this.account, tweet,
+                                      ComposeTweetWindow.Mode.REPLY);
+    ctw.show_all ();
+  }
+
+  public void mark_tweet_as_read (int64 tweet_id) {
+    DefaultTimeline home_timeline     = ((DefaultTimeline)this.main_widget.get_page(Page.STREAM));
+    DefaultTimeline mentions_timeline = ((DefaultTimeline)this.main_widget.get_page(Page.MENTIONS));
+    Cb.Tweet? tweet = null;
+    tweet = home_timeline.tweet_list.model.get_for_id (tweet_id,
+                                                       0);
+    if (tweet != null) {
+      tweet.set_seen (true);
+      home_timeline.unread_count --;
+    }
+
+    // and now with the MentionsTimeline
+    tweet = mentions_timeline.tweet_list.model.get_for_id (tweet_id,
+                                                           0);
+    if (tweet != null) {
+      tweet.set_seen (true);
+      mentions_timeline.unread_count --;
+    }
   }
 }

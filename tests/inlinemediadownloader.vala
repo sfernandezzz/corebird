@@ -33,37 +33,9 @@ void download_twice () {
   media.url = url;
 
   Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
-    Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
-      main_loop.quit ();
-    });
-  });
-
-  main_loop.run ();
-}
-
-void no_thumbnail () {
-  var main_loop = new GLib.MainLoop ();
-  var url = "http://pbs.twimg.com/media/BiHRjmFCYAAEKFg.png";
-  var media = new Cb.Media ();
-  media.url = url;
-
-  Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
-    Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
-      main_loop.quit ();
-    });
-  });
-  main_loop.run ();
-}
-
-
-void no_media () {
-  var main_loop = new GLib.MainLoop ();
-  var url = "http://pbs.twimg.com/media/BiHRjmFCYAAEKFg.png";
-  var media = new Cb.Media ();
-  media.url = url;
-
-  Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
-    Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
+    var media2 = new Cb.Media ();
+    media2.url = url;
+    Cb.MediaDownloader.get_default ().load_async.begin (media2, () => {
       main_loop.quit ();
     });
   });
@@ -84,27 +56,36 @@ void double_download () {
     collect_obj.emit ();
   });
 
+  media = new Cb.Media ();
+  media.url = url;
   Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
     assert (!media.invalid);
     collect_obj.emit ();
   });
 
-
+  media = new Cb.Media ();
+  media.url = url;
   Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
     assert (!media.invalid);
     collect_obj.emit ();
   });
 
+  media = new Cb.Media ();
+  media.url = url;
   Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
     assert (!media.invalid);
     collect_obj.emit ();
   });
 
+  media = new Cb.Media ();
+  media.url = url;
   Cb.MediaDownloader.get_default ().load_async.begin (media, () => {
     assert (!media.invalid);
     collect_obj.emit ();
   });
 
+  media = new Cb.Media ();
+  media.url = url;
   collect_obj.finished.connect (() => {
     main_loop.quit ();
   });
@@ -125,9 +106,13 @@ int main (string[] args) {
   GLib.Test.add_func ("/media/normal-download", normal_download);
   GLib.Test.add_func ("/media/animation-download", animation_download);
   GLib.Test.add_func ("/media/download-twice", download_twice);
-  GLib.Test.add_func ("/media/no-thumbnail", no_thumbnail);
-  GLib.Test.add_func ("/media/no-media", no_media);
   GLib.Test.add_func ("/media/double-download", double_download);
 
-  return GLib.Test.run ();
+
+
+  int retval = GLib.Test.run ();
+
+  Cb.MediaDownloader.get_default ().shutdown ();
+
+  return retval;
 }

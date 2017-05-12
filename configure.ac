@@ -1,4 +1,4 @@
-AC_INIT([corebird],[1.3],[mail@baedert.org])
+AC_INIT([corebird],[1.5],[mail@baedert.org])
 
 AC_PREREQ([2.65])
 
@@ -34,12 +34,18 @@ AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug], [Enable debugging]),, enab
 AM_CONDITIONAL([ENABLE_DEBUG], [ test "$enable_debug" = "yes"])
 
 # --disable-video
-AC_ARG_ENABLE(video, AS_HELP_STRING([--disable-video], [Disable video support]),, disable_video=no)
+AC_ARG_ENABLE(video, AS_HELP_STRING([--disable-video], [Disable video support]),
+              disable_video=yes, disable_video=no)
 AM_CONDITIONAL([DISABLE_VIDEO], [ test "$disable_video" = "yes"])
 
 # --disable-gst-check
 AC_ARG_ENABLE(gst_check, AS_HELP_STRING([--disable-gst-check], [Disable check for needed gstreamer elements]),, disable_gst_check=no)
 AM_CONDITIONAL([DISABLE_GST_CHECK], [ test "$disable_gst_check" = "yes"])
+
+# --disable-spellcheck
+AC_ARG_ENABLE(spellcheck, AS_HELP_STRING([--disable-spellcheck], [Disable spellchecking supoprt]),
+              disable_spellcheck=yes, disable_spellcheck=no)
+AM_CONDITIONAL([DISABLE_SPELLCHECK], [ test "$disable_spellcheck" = "yes"])
 
 
 
@@ -54,6 +60,10 @@ if test "$disable_video" = "no"; then
   pkg_modules="$pkg_modules gstreamer-video-1.0 >= 1.6"
 fi
 
+if test "$disable_spellcheck" = "no"; then
+  pkg_modules="$pkg_modules gspell-1 >= 1.0"
+fi
+
 PKG_CHECK_MODULES(CB, [$pkg_modules])
 
 
@@ -64,19 +74,21 @@ CB_VALA_FLAGS=" \
   --pkg sqlite3 \
   --pkg libsoup-2.4 \
   --pkg glib-2.0 \
-  --target-glib=2.38"
+  --target-glib=2.44"
 
-# Check for gtk+ again, this time only if the version is >= 3.22
-# This theoretically also depends on some vala version but one
-# can really only use those in lockstep anyay.
-AC_CHECK_LIB([gtk-3], [gtk_popover_popup],
-             [CB_VALA_FLAGS="$CB_VALA_FLAGS -D GTK322"],
-             )
 
 AC_SUBST(CB_CFLAGS)
 AC_SUBST(CB_LIBS)
 AC_SUBST(CB_VALA_FLAGS)
 
+
+# Check for valac >= 0.34, which binds gtk_popover_popup
+# as well as if that function exists in gtk+
+AM_PROG_VALAC([0.34.0], [
+AC_CHECK_LIB([gtk-3], [gtk_popover_popup],
+             [CB_VALA_FLAGS="$CB_VALA_FLAGS -D GTK322"],
+            )
+])
 
 AC_ARG_VAR([GLIB_COMPILE_RESOURCES],[the glib-compile-resources program])
 AC_PATH_PROG([GLIB_COMPILE_RESOURCES],[glib-compile-resources],[])
@@ -103,10 +115,14 @@ if test "$disable_video" = "no"; then
 fi
 
 if test "$enable_debug" = "yes"; then
-  CB_VALA_FLAGS="$CB_VALA_FLAGS -D DEBUG -g"
-  CB_CFLAGS="$CB_CFLAGS -D DEBUG"
+  CB_VALA_FLAGS="$CB_VALA_FLAGS -D DEBUG"
+  CB_CFLAGS="$CB_CFLAGS -D DEBUG -D G_DISABLE_CAST_CHECKS"
 fi
 
+if test "$disable_spellcheck" = "no"; then
+  CB_VALA_FLAGS="$CB_VALA_FLAGS -D SPELLCHECK --pkg gspell-1"
+  CB_CFLAGS="$CB_CFLAGS -D SPELLCHECK"
+fi
 
 if test "$disable_gst_check" = "no"; then
   # Check for gtksink
@@ -126,17 +142,25 @@ AC_CONFIG_FILES([
 Makefile
 src/Makefile
 data/Makefile
-data/256x256/Makefile
-data/128x128/Makefile
-data/96x96/Makefile
-data/64x64/Makefile
-data/48x48/Makefile
-data/32x32/Makefile
-data/24x24/Makefile
-data/16x16/Makefile
+data/hicolor/Makefile
+data/hicolor/256x256/Makefile
+data/hicolor/256x256/apps/Makefile
+data/hicolor/128x128/Makefile
+data/hicolor/128x128/apps/Makefile
+data/hicolor/96x96/Makefile
+data/hicolor/96x96/apps/Makefile
+data/hicolor/64x64/Makefile
+data/hicolor/64x64/apps/Makefile
+data/hicolor/48x48/Makefile
+data/hicolor/48x48/apps/Makefile
+data/hicolor/32x32/Makefile
+data/hicolor/32x32/apps/Makefile
+data/hicolor/24x24/Makefile
+data/hicolor/24x24/apps/Makefile
+data/hicolor/16x16/Makefile
+data/hicolor/16x16/apps/Makefile
 po/Makefile.in
 tests/Makefile
-examples/Makefile
 ])
 
 
@@ -145,13 +169,13 @@ AC_OUTPUT
 VALAC_VERSION=$($VALAC --version)
 
 echo "
-             Corebird  $VERSION
-               Prefix: ${prefix}
-        Vala Compiler: ${VALAC} ${CB_VALA_FLAGS}
-        valac version: ${VALAC_VERSION}
-           C Compiler: ${CC} ${CFLAGS}
-            Debugging: $enable_debug
-       Video disabled: $disable_video
-   Gst check disabled: $disable_gst_check
-   Gst check disabled: ${GTK_VERSION}
+                Corebird  $VERSION
+                  Prefix: ${prefix}
+           Vala Compiler: ${VALAC} ${CB_VALA_FLAGS}
+           valac version: ${VALAC_VERSION}
+              C Compiler: ${CC} ${CFLAGS}
+               Debugging: $enable_debug
+          Video disabled: $disable_video
+      Gst check disabled: $disable_gst_check
+  Spellchecking disabled: $disable_spellcheck
 "

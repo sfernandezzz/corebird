@@ -27,15 +27,16 @@ public class Corebird : Gtk.Application {
   private bool started_as_service = false;
 
   const GLib.ActionEntry[] app_entries = {
-    {"show-settings",     show_settings_activated         },
-    {"show-shortcuts",    show_shortcuts_activated        },
-    {"quit",              quit_application                },
-    {"show-about-dialog", about_activated                 },
-    {"show-dm-thread",    show_dm_thread,          "(xx)" },
-    {"show-window",       show_window,             "x"    },
+    {"show-settings",     show_settings_activated          },
+    {"show-shortcuts",    show_shortcuts_activated         },
+    {"quit",              quit_application                 },
+    {"show-about-dialog", about_activated                  },
+    {"show-dm-thread",    show_dm_thread,           "(xx)" },
+    {"show-window",       show_window,              "x"    },
+    {"mark-read",         mark_read_activated,      "(xx)" },
+    {"reply-to-tweet",    reply_to_tweet_activated, "(xx)" },
 #if DEBUG
-    {"post-json",         post_json,               "(ss)" },
-    {"print-debug",       print_debug,                    },
+    {"post-json",         post_json,                "(ss)" },
 #endif
   };
 
@@ -60,18 +61,21 @@ public class Corebird : Gtk.Application {
     bool start_service = false;
     bool stop_service = false;
     bool print_startup_accounts = false;
+    string? account_name = null;
 
-    OptionEntry[] options = new OptionEntry[5];
+    OptionEntry[] options = new OptionEntry[6];
     options[0] = {"tweet", 't', 0, OptionArg.STRING, ref compose_screen_name,
-                  "Shows only the 'compose tweet' window for the given account, nothing else.", "SCREEN_NAME"};
+                  "Shows only the 'compose tweet' window for the given account, nothing else.", "account name"};
     options[1] = {"start-service", 's', 0, OptionArg.NONE, ref start_service,
                   "Start service", null};
     options[2] = {"stop-service", 'p', 0, OptionArg.NONE, ref stop_service,
                   "Stop service, if it has been started as a service", null};
     options[3] = {"print-startup-accounts", 'a', 0, OptionArg.NONE, ref print_startup_accounts,
                   "Print configured startup accounts", null};
+    options[4] = {"account", 'c', 0, OptionArg.STRING, ref account_name,
+                  "Open the window for the given account", "account name"};
 
-    options[4] = {null};
+    options[5] = {null};
 
     string[] args = cmd.get_arguments ();
     string*[] _args = new string[args.length];
@@ -117,7 +121,7 @@ public class Corebird : Gtk.Application {
       this.started_as_service = true;
       this.activate ();
     } else {
-      open_startup_windows (compose_screen_name);
+      open_startup_windows (compose_screen_name, account_name);
     }
 
     return 0;
@@ -145,7 +149,7 @@ public class Corebird : Gtk.Application {
         }
       }
     } else {
-      open_startup_windows (null);
+      open_startup_windows (null, null);
     }
   }
 
@@ -190,11 +194,10 @@ public class Corebird : Gtk.Application {
     base.startup ();
     this.set_resource_base_path ("/org/baedert/corebird");
 
-    new ComposeImageManager ();
-    new LazyMenuButton ();
+    typeof (LazyMenuButton).ensure ();
 
 #if DEBUG
-    GLib.Environment.set_variable ("G_MESSAGES_DEBUG", "all", true);
+    GLib.Environment.set_variable ("G_MESSAGES_DEBUG", "corebird", true);
 #endif
 
     debug ("startup");
@@ -212,7 +215,7 @@ public class Corebird : Gtk.Application {
     Twitter.get ().init ();
 
     this.set_accels_for_action ("win.compose-tweet", {Settings.get_accel ("compose-tweet")});
-    this.set_accels_for_action ("win.toggle-sidebar", {Settings.get_accel ("toggle-sidebar")});
+    this.set_accels_for_action ("win.toggle-topbar", {Settings.get_accel ("toggle-sidebar")});
     this.set_accels_for_action ("win.switch-page(0)", {"<Alt>1"});
     this.set_accels_for_action ("win.switch-page(1)", {"<Alt>2"});
     this.set_accels_for_action ("win.switch-page(2)", {"<Alt>3"});
@@ -231,9 +234,6 @@ public class Corebird : Gtk.Application {
     // TweetInfoPage
     this.set_accels_for_action ("tweet.reply",    {"r"});
     this.set_accels_for_action ("tweet.favorite", {"f"});
-#if DEBUG
-    this.set_accels_for_action ("app.print-debug", {"<Primary>D"});
-#endif
 
     this.add_action_entries (app_entries, this);
 
@@ -254,18 +254,28 @@ public class Corebird : Gtk.Application {
 
   }
 
+  public override void shutdown () {
+    Cb.MediaDownloader.get_default ().shutdown ();
+    base.shutdown ();
+  }
+
   /**
    * Open startup windows.
    * Semantics: Open a window for every account in the startup-accounts array.
    * If that array is empty, look at all the account and if there is one, open that one.
    * If there is none, open a MainWindow with a null account.
    */
-  private void open_startup_windows (string? compose_screen_name = null) {
+  private void open_startup_windows (string? compose_screen_name, string? account_name) {
+    /* Explicitly prefer compose-name over account-name */
+    if (compose_screen_name != null && account_name != null) {
+      account_name = null;
+    }
+
     if (compose_screen_name != null) {
       Account? acc = Account.query_account (compose_screen_name);
       if (acc == null) {
         critical ("No account named `%s` is configured. Exiting.",
-                  compose_screen_name);
+                  account_name);
         return;
       }
       acc.init_proxy ();
@@ -274,6 +284,20 @@ public class Corebird : Gtk.Application {
                                        ComposeTweetWindow.Mode.NORMAL);
       cw.show ();
       this.add_window (cw);
+      return;
+    }
+
+    if (account_name != null) {
+      Account? acc = Account.query_account (account_name);
+      if (acc == null) {
+        critical ("No account named `%s` is configured. Exiting.",
+                  account_name);
+        return;
+      }
+
+      acc.init_proxy ();
+      acc.query_user_info_by_screen_name.begin ();
+      add_window_for_account (acc);
       return;
     }
 
@@ -483,8 +507,8 @@ public class Corebird : Gtk.Application {
     int64 sender_id  = value.get_child_value (1).get_int64 ();
     MainWindow main_window;
     if (is_window_open_for_user_id (account_id, out main_window)) {
-      var bundle = new Bundle ();
-      bundle.put_int64 ("sender_id", sender_id);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (DMPage.KEY_SENDER_ID, sender_id);
       main_window.main_widget.switch_page (Page.DM, bundle);
       main_window.present ();
     } else {
@@ -496,8 +520,8 @@ public class Corebird : Gtk.Application {
       }
       main_window = new MainWindow (this, account);
       this.add_window (main_window);
-      var bundle = new Bundle ();
-      bundle.put_int64 ("sender_id", sender_id);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (DMPage.KEY_SENDER_ID, sender_id);
       main_window.main_widget.switch_page (Page.DM, bundle);
 
       main_window.show_all ();
@@ -522,11 +546,28 @@ public class Corebird : Gtk.Application {
     }
   }
 
-#if DEBUG
-  private void print_debug (GLib.SimpleAction a, GLib.Variant? v) {
-    Twitter.get ().debug ();
+  private void mark_read_activated (GLib.SimpleAction a, GLib.Variant? v) {
+    int64 account_id = v.get_child_value (0).get_int64 ();
+    int64 tweet_id   = v.get_child_value (1).get_int64 ();
+    MainWindow main_window;
+
+    if (is_window_open_for_user_id (account_id, out main_window)) {
+      main_window.mark_tweet_as_read (tweet_id);
+    }
   }
 
+  private void reply_to_tweet_activated (GLib.SimpleAction a, GLib.Variant? v) {
+    int64 account_id = v.get_child_value (0).get_int64 ();
+    int64 tweet_id   = v.get_child_value (1).get_int64 ();
+    MainWindow main_window;
+
+    if (is_window_open_for_user_id (account_id, out main_window)) {
+      main_window.reply_to_tweet (tweet_id);
+      main_window.present ();
+    }
+  }
+
+#if DEBUG
   private void post_json (GLib.SimpleAction a, GLib.Variant? value) {
     string screen_name = value.get_child_value (0).get_string ();
     string json = value.get_child_value (1).get_string ();

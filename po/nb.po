@@ -1,0 +1,887 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR Timm Bäder
+# This file is distributed under the same license as the corebird package.
+#
+# Translators:
+# Åka Sikrom, 2016-2017
+msgid ""
+msgstr ""
+"Project-Id-Version: Corebird\n"
+"Report-Msgid-Bugs-To: https://github.com/baedert/corebird/issues/new\n"
+"POT-Creation-Date: 2017-04-29 18:29+0200\n"
+"PO-Revision-Date: 2017-04-30 09:37+0000\n"
+"Last-Translator: baedert <mail@baedert.org>\n"
+"Language-Team: Norwegian Bokmål (http://www.transifex.com/corebird/corebird/language/nb/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: nb\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: data/org.baedert.corebird.appdata.xml.in:5
+#: data/org.baedert.corebird.desktop.in:3
+msgid "Corebird"
+msgstr "Corebird"
+
+#: data/org.baedert.corebird.appdata.xml.in:6
+#: data/org.baedert.corebird.desktop.in:4
+msgid "Twitter Client"
+msgstr "Twitter-klient"
+
+#: data/org.baedert.corebird.appdata.xml.in:10
+msgid ""
+"Corebird is a native GTK+ twitter client that provides vital features such "
+"as Direct Messages (DMs), tweet notifications, conversation views."
+msgstr "Corebird er en GTK+-basert Twitter-klient som tilbyr viktige funksjoner som direktemeldinger, tweet-varslinger og samtalevisning."
+
+#: data/org.baedert.corebird.appdata.xml.in:13
+msgid ""
+"Additional features include local viewing of videos, multiple inline images,"
+" Lists, Filters, multiple accounts, etc."
+msgstr "Du kan også se videoer, flerbilde-tweets, lister, filtre og bruke ulike kontoer samtidig i programmet."
+
+#: data/org.baedert.corebird.appdata.xml.in:21
+msgid "Generic timeline view when using Corebird"
+msgstr "Generisk tidslinje-visning ved bruk av Corebird"
+
+#: data/org.baedert.corebird.appdata.xml.in:25
+msgid "Typical Twitter profile"
+msgstr "Typisk Twitter-profil"
+
+#: data/org.baedert.corebird.appdata.xml.in:29
+msgid "Account settings can be configured"
+msgstr "Kontoinnstillinger kan endres"
+
+#: data/org.baedert.corebird.appdata.xml.in:41
+msgid "Timm Bäder"
+msgstr ""
+
+#: data/org.baedert.corebird.desktop.in:5
+msgid "Use Twitter from within a normal desktop application"
+msgstr "Bruk Twitter som et vanlig skrivebordsprogram"
+
+#. TRANSLATORS: Search terms to find this application. Do NOT translate or
+#. localize the semicolons! The list MUST also end with a semicolon!
+#: data/org.baedert.corebird.desktop.in:7
+msgid "twitter;"
+msgstr "twitter;"
+
+#. TRANSLATORS: Do NOT translate or transliterate this text (this is an icon
+#. file name)!
+#: data/org.baedert.corebird.desktop.in:11
+msgid "corebird"
+msgstr "corebird"
+
+#. TRANSLATORS: This is the start of a "Replying to" line in a tweet
+#: src/CbUtils.c:87 src/TweetInfoPage.vala:479
+msgid "Replying to"
+msgstr ""
+
+#. TRANSLATORS: This gets appended to the "replying to" line
+#. * in a tweet. Example: "Replying to Foo and Bar" where
+#. * "and Bar" comes from this string.
+#: src/CbUtils.c:98 src/TweetInfoPage.vala:491
+msgid "and"
+msgstr ""
+
+#. TRANSLATORS: This gets appended to the "replying to" line
+#. * in a tweet
+#: src/CbUtils.c:107
+#, c-format
+msgid "and %d others"
+msgstr ""
+
+#: src/DMPage.vala:346
+msgid "Direct Conversation"
+msgstr "Direktesamtale"
+
+#: src/DMThreadsPage.vala:205
+#, c-format
+msgid "%d new Message from %s"
+msgid_plural "%d new Messages from %s"
+msgstr[0] "%d ny melding fra %s"
+msgstr[1] "%d nye meldinger fra %s"
+
+#: src/DMThreadsPage.vala:211 src/UserEventReceiver.vala:94
+#, c-format
+msgid "New direct message from %s"
+msgstr "Ny direktemelding fra %s"
+
+#: src/DMThreadsPage.vala:221 src/DMThreadsPage.vala:235
+msgid "Direct Messages"
+msgstr "Direktemeldinger"
+
+#: src/DefaultTimeline.vala:357
+msgid "Could not load tweets"
+msgstr "Klarte ikke å laste inn tweets"
+
+#: src/FavoritesTimeline.vala:67 src/FavoritesTimeline.vala:71
+#: src/TweetInfoPage.vala:521
+msgid "Favorites"
+msgstr "Favoritter"
+
+#: src/FilterPage.vala:47
+msgid "Add new Filter"
+msgstr "Legg til nytt filter"
+
+#: src/FilterPage.vala:317 src/FilterPage.vala:323
+msgid "Filters"
+msgstr "Filtre"
+
+#: src/HomeTimeline.vala:140
+#, c-format
+msgid "%s retweeted %s"
+msgstr "%s retweetet %s"
+
+#: src/HomeTimeline.vala:143
+#, c-format
+msgid "%s tweeted"
+msgstr "%s tweetet"
+
+#: src/HomeTimeline.vala:152
+#, c-format
+msgid "%d new Tweet!"
+msgid_plural "%d new Tweets!"
+msgstr[0] "%d ny tweet!"
+msgstr[1] "%d nye tweets!"
+
+#: src/HomeTimeline.vala:187
+msgid "Home"
+msgstr "Hjem"
+
+#: src/ListStatusesPage.vala:378
+msgid "List"
+msgstr "Liste"
+
+#: src/ListsPage.vala:123 src/ListsPage.vala:128 ui/profile-page.ui:364
+msgid "Lists"
+msgstr "Lister"
+
+#: src/MainWindow.vala:79
+msgid "Add new Account"
+msgstr "Legg til ny konto"
+
+#: src/MentionsTimeline.vala:91 src/UserEventReceiver.vala:111
+#, c-format
+msgid "%s mentioned %s"
+msgstr "%s nevnte %s"
+
+#: src/MentionsTimeline.vala:108 src/MentionsTimeline.vala:112
+msgid "Mentions"
+msgstr "Nevnelser"
+
+#: src/ProfilePage.vala:261
+msgid "Protected profile"
+msgstr "Beskyttet profil"
+
+#: src/ProfilePage.vala:319
+#, c-format
+msgid "Tweet to @%s"
+msgstr "Tweet til @%s"
+
+#: src/SearchPage.vala:371 src/SearchPage.vala:380 ui/search-page.ui:24
+msgid "Search"
+msgstr "Søk"
+
+#: src/TweetInfoPage.vala:303
+msgid "Could not show tweet"
+msgstr "Klarte ikke å vise tweet"
+
+#: src/TweetInfoPage.vala:520
+msgid "Retweets"
+msgstr "Retweets"
+
+#: src/TweetInfoPage.vala:529 src/widgets/MediaButton.vala:104
+msgid "Open in Browser"
+msgstr "Åpne i nettleser"
+
+#: src/TweetInfoPage.vala:529
+msgid "Source"
+msgstr "Kilde"
+
+#: src/TweetInfoPage.vala:575
+msgid "Tweet Details"
+msgstr "Tweet-detaljer"
+
+#: src/list/DMThreadEntry.vala:71
+#, c-format
+msgid "(%d unread)"
+msgid_plural "(%d unread)"
+msgstr[0] "(%d ulest)"
+msgstr[1] "(%d ulest)"
+
+#: src/list/FavImageRow.vala:68 ui/account-dialog.ui:202
+#: ui/account-dialog.ui:259 ui/filter-list-entry.ui:93
+#: ui/list-list-entry.ui:132 ui/list-statuses-page.ui:166
+#: ui/modify-snippet-dialog.ui:108 ui/tweet-info-page.ui:10
+#: ui/tweet-list-entry.ui:10
+msgid "Delete"
+msgstr "Slett"
+
+#: src/list/TweetListEntry.vala:453
+#, c-format
+msgid "Block %s"
+msgstr "Blokker %s"
+
+#: src/list/TweetListEntry.vala:609
+msgid "This tweet contains images marked as inappropriate"
+msgstr "Denne tweet-en inneholder bilder som er merket som upassende"
+
+#: src/list/TweetListEntry.vala:616
+msgid "Show anyway"
+msgstr "Vis likevel"
+
+#: src/util/Utils.vala:168
+msgid "Now"
+msgstr "Nå"
+
+#: src/util/Utils.vala:170
+#, c-format
+msgid "%dm"
+msgstr "%dm"
+
+#: src/util/Utils.vala:174
+#, c-format
+msgid "%dh"
+msgstr "%dh"
+
+#: src/widgets/AccountCreateWidget.vala:42
+msgid "Don’t have a Twitter account yet?"
+msgstr ""
+
+#: src/widgets/AccountCreateWidget.vala:42
+msgid "Create one"
+msgstr "Lag konto"
+
+#: src/widgets/AccountCreateWidget.vala:57
+msgid ""
+"Unauthorized. Most of the time, this means that there’s something wrong with"
+" the Twitter servers and you should try again later"
+msgstr ""
+
+#: src/widgets/AccountCreateWidget.vala:69
+#, c-format
+msgid "Could not open %s"
+msgstr "Klarte ikke å åpne %s"
+
+#: src/widgets/AccountCreateWidget.vala:92
+msgid "Wrong PIN"
+msgstr "Feil PIN"
+
+#: src/widgets/AccountCreateWidget.vala:118
+msgid "Account already in use"
+msgstr "Konto allerede i bruk"
+
+#: src/widgets/CompletionTextView.vala:40
+msgid "No users found"
+msgstr "Fant ingen brukere"
+
+#: src/widgets/FollowButton.vala:43
+msgid "Follow"
+msgstr "Følg"
+
+#: src/widgets/FollowButton.vala:44
+msgid "Unfollow"
+msgstr "Avfølg"
+
+#: src/widgets/MediaButton.vala:48
+msgid "Copy URL"
+msgstr "Kopier nettadresse"
+
+#: src/widgets/MediaButton.vala:106
+msgid "Save as…"
+msgstr ""
+
+#: src/widgets/MediaButton.vala:269
+msgid "Save Video"
+msgstr ""
+
+#: src/widgets/MediaButton.vala:271
+msgid "Save Image"
+msgstr ""
+
+#: src/widgets/MediaButton.vala:276 src/window/AccountDialog.vala:314
+#: src/window/ComposeTweetWindow.vala:241
+#: src/window/ComposeTweetWindow.vala:271
+#: src/window/ComposeTweetWindow.vala:380 src/window/UserListDialog.vala:47
+#: ui/account-dialog.ui:25 ui/account-dialog.ui:246 ui/compose-window.ui:41
+#: ui/filter-list-entry.ui:80 ui/list-list-entry.ui:98
+#: ui/list-statuses-page.ui:173 ui/modify-filter-dialog.ui:13
+#: ui/modify-snippet-dialog.ui:14 ui/user-filter-entry.ui:114
+msgid "Cancel"
+msgstr "Avbryt"
+
+#: src/widgets/MediaButton.vala:278 src/window/AccountDialog.vala:406
+#: src/window/AccountDialog.vala:427 src/window/UserListDialog.vala:48
+#: ui/account-dialog.ui:33 ui/list-statuses-page.ui:129
+#: ui/modify-filter-dialog.ui:20 ui/modify-snippet-dialog.ui:21
+msgid "Save"
+msgstr "Lagre"
+
+#: src/widgets/TweetListBox.vala:123
+msgid "Loading…"
+msgstr ""
+
+#: src/widgets/TweetListBox.vala:126 src/widgets/TweetListBox.vala:177
+msgid "No entries found"
+msgstr "Fant ingen elementer"
+
+#: src/widgets/TweetListBox.vala:137 ui/account-create-widget.ui:119
+msgid "Retry"
+msgstr "Prøv på nyt"
+
+#: src/window/AccountDialog.vala:311
+msgid "Select Banner Image"
+msgstr ""
+
+#: src/window/AccountDialog.vala:316 src/window/ComposeTweetWindow.vala:273
+#: src/window/ComposeTweetWindow.vala:382
+msgid "Open"
+msgstr "Åpne"
+
+#: src/window/AccountDialog.vala:348
+msgid "Image does not meet minimum size requirements:"
+msgstr ""
+
+#: src/window/AccountDialog.vala:349
+#, c-format
+msgid "Minimum width: %d pixel"
+msgid_plural "Minimum width: %d pixels"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/window/AccountDialog.vala:351
+#, c-format
+msgid "Minimum height: %d pixel"
+msgid_plural "Minimum height: %d pixels"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/window/AccountDialog.vala:381 src/window/AccountDialog.vala:394
+msgid "Pick"
+msgstr ""
+
+#: src/window/ComposeTweetWindow.vala:107
+msgid "Quote tweet"
+msgstr "Siter tweet"
+
+#: src/window/ComposeTweetWindow.vala:268
+#: src/window/ComposeTweetWindow.vala:377
+msgid "Select Image"
+msgstr "Velg bild"
+
+#: src/window/ComposeTweetWindow.vala:297
+#, c-format
+msgid ""
+"The selected image is too big. The maximum file size per image is %'d MB"
+msgstr "Valgt bilde er for stort. Maksimal filstørrelse per bilde er %'d MB"
+
+#: src/window/ComposeTweetWindow.vala:299
+#: src/window/ComposeTweetWindow.vala:305
+#: src/window/ComposeTweetWindow.vala:333
+msgid "Back"
+msgstr "Tilbake"
+
+#: src/window/ComposeTweetWindow.vala:304
+msgid "Only one GIF file per tweet is allowed."
+msgstr ""
+
+#: src/window/ModifyFilterDialog.vala:45
+msgid "Modify Filter"
+msgstr "Endre filter"
+
+#: src/window/ModifyFilterDialog.vala:76
+msgid "Matches"
+msgstr "Treff"
+
+#: src/window/ModifyFilterDialog.vala:78
+msgid "Doesn’t match"
+msgstr ""
+
+#: src/window/ModifySnippetDialog.vala:44
+msgid "Modify Snippet"
+msgstr "Endre kodesnut"
+
+#: src/window/ModifySnippetDialog.vala:63
+msgid "Snippet can’t be empty"
+msgstr ""
+
+#: src/window/ModifySnippetDialog.vala:70
+msgid "Replacement can’t be empty"
+msgstr ""
+
+#: src/window/ModifySnippetDialog.vala:78
+msgid "Snippet may not contain whitespace"
+msgstr "Kodesnutt kan ikke inneholde mellomrom"
+
+#: src/window/ModifySnippetDialog.vala:86
+msgid "Snippet already exists"
+msgstr "Kodesnutt finnes allerede"
+
+#: src/window/SettingsDialog.vala:83
+msgid ""
+"Hey, check out this new #Corebird version! \\ (•◡•) / #cool "
+"#newisalwaysbetter"
+msgstr "Sjekk ut den nye versjonen av #Corebird ! \\ (•◡•) / #cool"
+
+#: src/window/UserListDialog.vala:40
+msgid "Add to or Remove User From List"
+msgstr "Legg til eller fjern bruker fra liste"
+
+#: src/window/UserListDialog.vala:69
+msgid "You have no lists."
+msgstr "Du har ingen lister."
+
+#: ui/about-dialog.ui:5
+msgid "About Corebird"
+msgstr "Om Corebird"
+
+#: ui/account-create-widget.ui:28
+msgid "New Account"
+msgstr "Ny konto"
+
+#: ui/account-create-widget.ui:47
+msgid ""
+"To authenticate Corebird, you need a PIN from twitter.com with the account "
+"you wish to add"
+msgstr ""
+
+#: ui/account-create-widget.ui:58
+msgid "Request PIN"
+msgstr "Be om PIN"
+
+#: ui/account-create-widget.ui:88
+msgid "Enter PIN from twitter.com below:"
+msgstr ""
+
+#: ui/account-create-widget.ui:106
+msgid "PIN"
+msgstr ""
+
+#: ui/account-create-widget.ui:132 ui/list-statuses-page.ui:358
+msgid "Confirm"
+msgstr "Bekreft"
+
+#: ui/account-dialog.ui:19
+msgid "Account Settings"
+msgstr "Kontoinnstillinger"
+
+#: ui/account-dialog.ui:88
+msgid "Name"
+msgstr "Navn"
+
+#: ui/account-dialog.ui:117
+msgid "Website"
+msgstr "Nettside"
+
+#: ui/account-dialog.ui:171
+msgid "Autostart"
+msgstr "Autostart"
+
+#: ui/account-dialog.ui:234
+msgid "Do you really want to delete this account?"
+msgstr "Er du sikker på at du vil slette denne kontoen?"
+
+#: ui/compose-window.ui:11 ui/compose-window.ui:25
+msgid "Compose Tweet"
+msgstr "Skriv tweet"
+
+#: ui/compose-window.ui:48 ui/dm-page.ui:51
+msgid "Send"
+msgstr "Send"
+
+#: ui/compose-window.ui:151
+msgid "Add Image"
+msgstr "Legg til bild"
+
+#: ui/compose-window.ui:159
+msgid "Show favorite images"
+msgstr ""
+
+#: ui/filter-page.ui:71 ui/search-page.ui:86
+msgid "Users"
+msgstr "Brukere"
+
+#: ui/list-list-entry.ui:109
+msgid "Subscribe"
+msgstr "Abonner"
+
+#: ui/list-list-entry.ui:122
+msgid "Unsubscribe"
+msgstr "Avslutt abonnement"
+
+#: ui/list-statuses-page.ui:26
+msgid "Subscribers:"
+msgstr "Abonnenter:"
+
+#: ui/list-statuses-page.ui:49
+msgid "Members:"
+msgstr "Medlemmer:"
+
+#: ui/list-statuses-page.ui:72
+msgid "Creator:"
+msgstr "Laget av:"
+
+#: ui/list-statuses-page.ui:84
+msgid "Created at:"
+msgstr "Laget:"
+
+#: ui/list-statuses-page.ui:119
+msgid "Edit"
+msgstr "Rediger"
+
+#: ui/list-statuses-page.ui:194
+msgid "Mode:"
+msgstr "Modus:"
+
+#: ui/list-statuses-page.ui:217
+msgid "Private"
+msgstr "Privat"
+
+#: ui/list-statuses-page.ui:218
+msgid "Public"
+msgstr "Offentlig"
+
+#: ui/list-statuses-page.ui:296
+msgid "Description"
+msgstr "Beskrivelse"
+
+#: ui/load-more-entry.ui:11
+msgid "Load more"
+msgstr "Last inn mer"
+
+#: ui/main-window.ui:64
+msgid "Show configured accounts"
+msgstr "Vis oppsatte kontoer"
+
+#: ui/main-window.ui:82
+msgid "Compose tweet"
+msgstr "Skriv tweet"
+
+#: ui/main-window.ui:99
+msgid "New tweet"
+msgstr "Ny tweet"
+
+#: ui/menus.ui:6 ui/settings-dialog.ui:16 ui/settings-dialog.ui:22
+msgid "Settings"
+msgstr "Innstillinger"
+
+#: ui/menus.ui:10
+msgid "Shortcuts"
+msgstr "Snarveier"
+
+#: ui/menus.ui:15
+msgid "About"
+msgstr "Om"
+
+#: ui/menus.ui:19
+msgid "Quit"
+msgstr "Avslutt"
+
+#: ui/modify-filter-dialog.ui:6
+msgid "Add New Filter"
+msgstr "Legg til nytt filter"
+
+#: ui/modify-snippet-dialog.ui:6
+msgid "Add New Snippet"
+msgstr "Legg til ny kodesnut"
+
+#: ui/modify-snippet-dialog.ui:46
+msgid "Keyword"
+msgstr "Nøkkelord"
+
+#: ui/modify-snippet-dialog.ui:72
+msgid "Replacement"
+msgstr "Erstatning"
+
+#: ui/new-list-entry.ui:30
+msgid "Create New List"
+msgstr "Lag ny liste"
+
+#: ui/new-list-entry.ui:51
+msgid "Name:"
+msgstr "Navn:"
+
+#: ui/new-list-entry.ui:73
+msgid "Create"
+msgstr "Lag"
+
+#: ui/profile-page.ui:6
+msgid "Write Direct Message"
+msgstr "Skriv direktemelding"
+
+#: ui/profile-page.ui:14
+msgid "Add to/Remove from List"
+msgstr "Legg til/fjern fra liste"
+
+#: ui/profile-page.ui:20
+msgid "Blocked"
+msgstr "Blokkert"
+
+#: ui/profile-page.ui:24
+msgid "Muted"
+msgstr "Skjult"
+
+#: ui/profile-page.ui:28
+msgid "Retweets disabled"
+msgstr "Retweets slått av"
+
+#: ui/profile-page.ui:166
+msgid "Follows you"
+msgstr "Følger deg"
+
+#: ui/profile-page.ui:241 ui/search-page.ui:74 ui/settings-dialog.ui:420
+msgid "Tweets"
+msgstr "Tweets"
+
+#: ui/profile-page.ui:282
+msgid "Followers"
+msgstr "Følgere"
+
+#: ui/profile-page.ui:323
+msgid "Following"
+msgstr "Følger"
+
+#: ui/settings-dialog.ui:59
+msgid "Show inline media"
+msgstr "Vis multimedier"
+
+#: ui/settings-dialog.ui:78
+msgid "Always show"
+msgstr "Vis alltid"
+
+#: ui/settings-dialog.ui:79
+msgid "Always hide"
+msgstr "Skjul allti"
+
+#: ui/settings-dialog.ui:80
+msgid "Hide in timeline"
+msgstr "Skjul fra tidslinje"
+
+#: ui/settings-dialog.ui:101
+msgid "Auto scroll on new tweets"
+msgstr "Rull automatisk ved nye tweets"
+
+#: ui/settings-dialog.ui:131
+msgid "Double-click activation"
+msgstr "Dobbeltklikk-trigging"
+
+#: ui/settings-dialog.ui:161
+msgid "Interface"
+msgstr "Grensesnitt"
+
+#: ui/settings-dialog.ui:179
+msgid "On New Tweets"
+msgstr "Ved nye tweets"
+
+#: ui/settings-dialog.ui:193
+msgid "Actions"
+msgstr "Handlinger"
+
+#: ui/settings-dialog.ui:208
+msgid "On New Mentions"
+msgstr "Ved nye nevnelser"
+
+#: ui/settings-dialog.ui:222
+msgid "On New Messages"
+msgstr "Ved nye meldinger"
+
+#: ui/settings-dialog.ui:266
+msgid "Never"
+msgstr "Aldri"
+
+#: ui/settings-dialog.ui:267
+msgid "Every"
+msgstr "Hver"
+
+#: ui/settings-dialog.ui:268
+msgid "Stack 5"
+msgstr "Stabel 5"
+
+#: ui/settings-dialog.ui:269
+msgid "Stack 10"
+msgstr "Stabel 10"
+
+#: ui/settings-dialog.ui:270
+msgid "Stack 25"
+msgstr "Stabel 25"
+
+#: ui/settings-dialog.ui:271
+msgid "Stack 50"
+msgstr "Stabel 50"
+
+#: ui/settings-dialog.ui:284
+msgid "Notifications"
+msgstr "Varslinger"
+
+#: ui/settings-dialog.ui:311
+msgid "Round avatars"
+msgstr "Runde profilbilder"
+
+#: ui/settings-dialog.ui:338
+msgid "Remove trailing hashtags"
+msgstr "Fjern avsluttende hasjtagger"
+
+#: ui/settings-dialog.ui:366
+msgid "Remove media links"
+msgstr "Fjern medielenker"
+
+#: ui/settings-dialog.ui:394
+msgid "Hide inappropriate content"
+msgstr "Skjul upassende innhold"
+
+#: ui/settings-dialog.ui:441
+msgid "No snippets configured."
+msgstr "Ingen kodesnutter satt opp."
+
+#: ui/settings-dialog.ui:480
+msgid "You can activate snippets by writing the keyword and pressing TAB."
+msgstr "Slå på kodesnutter ved å skrive med tastaturet og trykk TAB."
+
+#: ui/settings-dialog.ui:494
+msgid "Snippets"
+msgstr "Kodesnutter"
+
+#: ui/shortcuts-window.ui:12
+msgctxt "shortcuts window"
+msgid "General"
+msgstr "Generelt"
+
+#: ui/shortcuts-window.ui:17
+msgctxt "shortcuts window"
+msgid "Compose Tweet"
+msgstr "Skriv tweet"
+
+#: ui/shortcuts-window.ui:24
+msgctxt "shortcuts window"
+msgid "Show Account settings"
+msgstr "Vis kontoinnstillinger"
+
+#: ui/shortcuts-window.ui:31
+msgctxt "shortcuts window"
+msgid "Show Accounts Popover"
+msgstr "Vis pop-over med kontoer"
+
+#: ui/shortcuts-window.ui:38
+msgctxt "shortcuts window"
+msgid "Show Application Settings"
+msgstr "Vis programinnstillinger"
+
+#: ui/shortcuts-window.ui:45
+msgctxt "shortcuts window"
+msgid "Toggle Topbar"
+msgstr "Slå på/av topplinje"
+
+#: ui/shortcuts-window.ui:52
+msgctxt "shortcuts window"
+msgid "Go Back"
+msgstr "Gå tilbake"
+
+#: ui/shortcuts-window.ui:59
+msgctxt "shortcuts window"
+msgid "Go Forward"
+msgstr "Gå framover"
+
+#: ui/shortcuts-window.ui:66
+msgctxt "shortcuts window"
+msgid "Go to nth page"
+msgstr "Gå til n-te sid"
+
+#: ui/shortcuts-window.ui:74
+msgctxt "shortcuts window"
+msgid "Tweets"
+msgstr "Tweets"
+
+#: ui/shortcuts-window.ui:79
+msgctxt "shortcuts window"
+msgid "Retweet"
+msgstr "Retweet"
+
+#: ui/shortcuts-window.ui:86
+msgctxt "shortcuts window"
+msgid "Favorite"
+msgstr "Favoritt"
+
+#: ui/shortcuts-window.ui:93
+msgctxt "shortcuts window"
+msgid "Reply"
+msgstr "Svar"
+
+#: ui/shortcuts-window.ui:100
+msgctxt "shortcuts window"
+msgid "Quote"
+msgstr "Sitat"
+
+#: ui/shortcuts-window.ui:107
+msgctxt "shortcuts window"
+msgid "Show Details"
+msgstr "Vis detaljer"
+
+#: ui/shortcuts-window.ui:114
+msgctxt "shortcuts window"
+msgid "Delete"
+msgstr "Slett"
+
+#: ui/start-conversation-entry.ui:29
+msgid "Start new conversation"
+msgstr "Start ny samtale"
+
+#: ui/start-conversation-entry.ui:49
+msgid "With:"
+msgstr "Med:"
+
+#: ui/start-conversation-entry.ui:75
+msgid "Go"
+msgstr "Kjør"
+
+#: ui/tweet-info-page.ui:6 ui/tweet-list-entry.ui:6
+msgid "Quote"
+msgstr "Siter"
+
+#: ui/tweet-info-page.ui:265
+msgid "Retweet tweet"
+msgstr "Retweet tweet"
+
+#: ui/tweet-info-page.ui:292
+msgid "Favorite tweet"
+msgstr "Merk tweet som favoritt"
+
+#: ui/tweet-info-page.ui:319
+msgid "Reply to tweet"
+msgstr "Svar på tweet"
+
+#: ui/tweet-info-page.ui:357
+msgid "More"
+msgstr "Mer"
+
+#: ui/tweet-list-entry.ui:60
+msgid "Favorite"
+msgstr "Favoritt"
+
+#: ui/tweet-list-entry.ui:81
+msgid "Reply"
+msgstr "Svar"
+
+#: ui/user-filter-entry.ui:125
+msgid "Unblock"
+msgstr "Fjern blokkering"
+
+#: ui/user-list-entry.ui:67
+msgid "Show settings of this account"
+msgstr "Vis innstillinger for denne kontoen"
+
+#: ui/user-list-entry.ui:92
+msgid "Open in new window"
+msgstr "Åpne i nytt vindu"
+
+#: ui/user-list-entry.ui:116
+msgid "Go to profile"
+msgstr "Gå til profil"
+
+#: ui/user-lists-widget.ui:14
+msgid "Created"
+msgstr "Laget"
+
+#: ui/user-lists-widget.ui:86
+msgid "Subscribed to"
+msgstr "Abonnert på"

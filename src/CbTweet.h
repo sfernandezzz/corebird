@@ -20,8 +20,8 @@
 
 #include <glib-object.h>
 #include <json-glib/json-glib.h>
-#include "Types.h"
-#include "Media.h"
+#include "CbTypes.h"
+#include "CbMedia.h"
 
 #define CB_TWEET_MAX_LENGTH 140
 
@@ -75,8 +75,7 @@ struct _CbTweet
   gint64 my_retweet;
   char *notification_id;
   guint seen : 1;
-  /** if 0, this tweet is NOT part of a conversation */
-  gint64 reply_id;
+
   guint retweet_count;
   guint favorite_count;
 
@@ -114,6 +113,9 @@ char       *cb_tweet_get_filter_text (CbTweet *tweet);
 
 gboolean    cb_tweet_get_seen (CbTweet *tweet);
 void        cb_tweet_set_seen (CbTweet *tweet, gboolean value);
+
+CbUserIdentity *cb_tweet_get_reply_users (CbTweet *tweet,
+                                          guint   *n_reply_users);
 
 #endif
 

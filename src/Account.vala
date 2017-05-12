@@ -29,14 +29,14 @@ public class Account : GLib.Object {
   public Cairo.Surface avatar       {public get; public set;}
   public Rest.OAuthProxy proxy;
   public UserStream user_stream;
-  public UserCounter user_counter;
+  public Cb.UserCounter user_counter;
   private UserEventReceiver event_receiver;
   public NotificationManager notifications;
   public int64[] friends;
   public int64[] blocked;
   public int64[] muted;
   public int64[] disabled_rts;
-  public GLib.GenericArray<Filter> filters;
+  public GLib.GenericArray<Cb.Filter> filters;
   public signal void info_changed (string screen_name, string name,
                                    Cairo.Surface avatar_small, Cairo.Surface avatar);
 
@@ -44,7 +44,7 @@ public class Account : GLib.Object {
     this.id = id;
     this.screen_name = screen_name;
     this.name = name;
-    this.filters = new GLib.GenericArray<Filter> ();
+    this.filters = new GLib.GenericArray<Cb.Filter> ();
     this.event_receiver = new UserEventReceiver (this);
     this.notifications = new NotificationManager (this);
   }
@@ -61,8 +61,7 @@ public class Account : GLib.Object {
     this.db = new Sql.Database (Dirs.config (@"accounts/$id.db"),
                                 Sql.ACCOUNTS_INIT_FILE,
                                 Sql.ACCOUNTS_SQL_VERSION);
-    user_counter = new UserCounter ();
-    user_counter.load (db);
+    user_counter = new Cb.UserCounter ();
     this.load_filters ();
   }
 
@@ -101,7 +100,7 @@ public class Account : GLib.Object {
 
   public void uninit () {
     this.proxy = null;
-    this.user_counter.save (this.db);
+    this.user_counter.save (this.db.get_sqlite_db ());
     this.user_stream.unregister (this.event_receiver);
     this.user_stream.stop ();
     this.user_stream = null;
@@ -146,7 +145,7 @@ public class Account : GLib.Object {
    */
   public async void query_user_info_by_screen_name (string? screen_name = null) {
     if (proxy == null)
-      error ("Proxy not initied");
+      error ("Proxy not initialized");
 
     var call = proxy.new_call ();
     call.set_function ("1.1/users/show.json");
@@ -361,14 +360,14 @@ public class Account : GLib.Object {
   private void load_filters () {
     this.db.select ("filters").cols ("content", "id")
               .order ("id").run ((cols) => {
-      Filter f = new Filter (cols[0]);
-      f.id = int.parse (cols[1]);
+      Cb.Filter f = new Cb.Filter (cols[0]);
+      f.set_id (int.parse (cols[1]));
       filters.add (f);
       return true;
     });
   }
 
-  public void add_filter (owned Filter f) {
+  public void add_filter (owned Cb.Filter f) {
     this.filters.add (f);
   }
 
@@ -633,7 +632,8 @@ public class Account : GLib.Object {
     for (uint i = 0; i < accounts.length; i ++) {
       unowned Account a = accounts.get (i);
 
-      if (screen_name == a.screen_name)
+      if (screen_name == a.screen_name ||
+          screen_name == "@" + a.screen_name)
         return a;
     }
     return null;

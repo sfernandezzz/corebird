@@ -17,6 +17,11 @@
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/dm-page.ui")]
 class DMPage : IPage, IMessageReceiver, Gtk.Box {
+  public const int KEY_SENDER_ID   = 0;
+  public const int KEY_SCREEN_NAME = 1;
+  public const int KEY_USER_NAME   = 2;
+  public const int KEY_AVATAR_URL  = 3;
+
   public int unread_count                   { get { return 0; } }
   private unowned MainWindow main_window;
   public unowned MainWindow window {
@@ -25,7 +30,7 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
     }
   }
   public unowned Account account;
-  public unowned DeltaUpdater delta_updater;
+  public Cb.DeltaUpdater delta_updater;
   public int id                             { get; set; }
   [GtkChild]
   private Gtk.Button send_button;
@@ -41,12 +46,12 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
   private int64 lowest_id = int64.MAX;
   private bool was_scrolled_down = false;
 
-  public DMPage (int id, Account account, DeltaUpdater delta_updater) {
+  public DMPage (int id, Account account) {
     this.id = id;
     this.account = account;
-    this.delta_updater = delta_updater;
+    this.delta_updater = new Cb.DeltaUpdater (messages_list);
     text_view.buffer.changed.connect (recalc_length);
-    messages_list.set_sort_func (ITwitterItem.sort_func_inv);
+    messages_list.set_sort_func (twitter_item_sort_func_inv);
     placeholder_box.show ();
     messages_list.set_placeholder(placeholder_box);
     scroll_widget.scrolled_to_start.connect (load_older);
@@ -112,6 +117,10 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
       if (obj.get_int_member ("sender_id") != this.user_id)
         return;
 
+      /* Writing with ourselves, we have the message already */
+      if (this.user_id == this.account.id)
+        return;
+
       var text = obj.get_string_member ("text");
       if (obj.has_member ("entities")) {
         var urls = obj.get_object_member ("entities").get_array_member ("urls");
@@ -139,12 +148,11 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
       new_msg.text = text;
       new_msg.name = sender.get_string_member ("name");
       new_msg.screen_name = sender.get_string_member ("screen_name");
-      new_msg.timestamp = Utils.parse_date (obj.get_string_member ("created_at")).to_unix ();
+      new_msg.timestamp = Cb.Utils.parse_date (obj.get_string_member ("created_at")).to_unix ();
       new_msg.main_window = main_window;
       new_msg.user_id = sender.get_int_member ("id");
       new_msg.update_time_delta ();
       new_msg.load_avatar (sender.get_string_member ("profile_image_url"));
-      delta_updater.add (new_msg);
       messages_list.add (new_msg);
       if (scroll_widget.scrolled_down)
         scroll_widget.scroll_down_next ();
@@ -156,12 +164,18 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
     scroll_widget.balance_next_upper_change (TOP);
     // Load messages
     // TODO: Fix code duplication
-    account.db.select ("dms").cols ("from_id", "to_id", "text", "from_name", "from_screen_name",
-                                    "timestamp", "id")
-              .where (@"(`from_id`='$user_id' OR `to_id`='$user_id') AND `id` < '$lowest_id'")
-              .order ("timestamp DESC")
-              .limit (35)
-              .run ((vals) => {
+    var query = account.db.select ("dms")
+                          .cols ("from_id", "to_id", "text", "from_name", "from_screen_name",
+                                 "timestamp", "id");
+
+    if (user_id == account.id)
+      query.where (@"`from_id`='$user_id' AND `to_id`='$user_id' AND `id` < '$lowest_id'");
+    else
+      query.where (@"(`from_id`='$user_id' OR `to_id`='$user_id') AND `id` < '$lowest_id'");
+
+      query.order ("timestamp DESC")
+           .limit (35)
+           .run ((vals) => {
       int64 id = int64.parse (vals[6]);
       if (id < lowest_id)
         lowest_id = id;
@@ -182,15 +196,14 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
         Cairo.Surface? s = Twitter.get ().load_avatar_for_user_id.end (res);
         entry.avatar = s;
       });
-      delta_updater.add (entry);
       messages_list.add (entry);
       return true;
     });
 
   }
 
-  public void on_join (int page_id, Bundle? args) {
-    int64 user_id = args.get_int64 ("sender_id");
+  public void on_join (int page_id, Cb.Bundle? args) {
+    int64 user_id = args.get_int64 (KEY_SENDER_ID);
     if (user_id == 0)
       return;
 
@@ -198,12 +211,12 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
     this.user_id = user_id;
     string screen_name;
     string name = null;
-    if ((screen_name = args.get_string ("screen_name")) != null) {
-      name = args.get_string ("name");
+    if ((screen_name = args.get_string (KEY_SCREEN_NAME)) != null) {
+      name = args.get_string (KEY_USER_NAME);
       placeholder_box.user_id = user_id;
       placeholder_box.screen_name = screen_name;
       placeholder_box.name = name;
-      placeholder_box.avatar_url = args.get_string ("avatar_url");
+      placeholder_box.avatar_url = args.get_string (KEY_AVATAR_URL);
       placeholder_box.load_avatar ();
     }
 
@@ -218,12 +231,17 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
 
     var now = new GLib.DateTime.now_local ();
     // Load messages
-    account.db.select ("dms").cols ("from_id", "to_id", "text", "from_name", "from_screen_name",
-                                    "timestamp", "id")
-              .where (@"`from_id`='$user_id' OR `to_id`='$user_id'")
-              .order ("timestamp DESC")
-              .limit (35)
-              .run ((vals) => {
+    var query = account.db.select ("dms")
+                           .cols ("from_id", "to_id", "text", "from_name", "from_screen_name",
+                                  "timestamp", "id");
+    if (user_id == account.id)
+      query.where (@"`from_id`='$user_id' AND `to_id`='$user_id'");
+    else
+      query.where (@"`from_id`='$user_id' OR `to_id`='$user_id'");
+
+    query.order ("timestamp DESC")
+         .limit (35)
+         .run ((vals) => {
       int64 id = int64.parse (vals[6]);
       if (id < lowest_id)
         lowest_id = id;
@@ -246,7 +264,6 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
         Cairo.Surface? s = Twitter.get ().load_avatar_for_user_id.end (res);
         entry.avatar = s;
       });
-      delta_updater.add (entry);
       messages_list.add (entry);
       return true;
     });
@@ -280,10 +297,10 @@ class DMPage : IPage, IMessageReceiver, Gtk.Box {
     entry.screen_name = account.screen_name;
     entry.timestamp = new GLib.DateTime.now_local ().to_unix ();
     entry.text = GLib.Markup.escape_text (text_view.buffer.text);
+    entry.main_window = main_window;
     entry.name = account.name;
     entry.avatar = account.avatar;
     entry.update_time_delta ();
-    delta_updater.add (entry);
     messages_list.add (entry);
     var call = account.proxy.new_call ();
     call.set_function ("1.1/direct_messages/new.json");

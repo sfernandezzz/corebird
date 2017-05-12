@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <template class="UserListEntry" parent="GtkListBoxRow">
-    <property name="visible">True</property>
-    <property name="can-focus">True</property>
+    <property name="visible">1</property>
+    <property name="can-focus">1</property>
     <child>
       <object class="GtkGrid" id="grid">
         <property name="visible">1</property>
@@ -29,6 +29,8 @@
             <property name="margin-bottom">1</property>
             <property name="margin-end">20</property>
             <property name="yalign">1</property>
+            <property name="xalign">0</property>
+            <property name="ellipsize">end</property>
             <attributes>
               <attribute name="weight" value="bold"/>
             </attributes>

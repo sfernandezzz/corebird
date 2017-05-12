@@ -16,7 +16,7 @@
  */
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/user-filter-entry.ui")]
-class UserFilterEntry : Gtk.ListBoxRow, ITwitterItem {
+class UserFilterEntry : Gtk.ListBoxRow, Cb.TwitterItem {
   [GtkChild]
   private Gtk.Label name_label;
   [GtkChild]
@@ -49,24 +49,29 @@ class UserFilterEntry : Gtk.ListBoxRow, ITwitterItem {
     set {}
   }
 
-  public int64 sort_factor {
-    get{ return 2; }
-  }
-
   public int64 user_id;
 
   public signal void deleted (int64 id);
 
   public bool muted = false;
   public bool blocked = false;
+  private GLib.TimeSpan last_timediff;
 
   private void real_set_avatar (string avatar_url) {
-    avatar_image.surface = Twitter.get ().get_avatar (user_id, avatar_url, (a) => {
-      avatar_image.surface = a;
-    }, 48 * this.get_scale_factor ());
+    Twitter.get ().get_avatar.begin (user_id, avatar_url, avatar_image, 48 * this.get_scale_factor ());
   }
 
   public int update_time_delta (GLib.DateTime? now = null) {return 0;}
+  public int64 get_sort_factor () { return 2; }
+  public int64 get_timestamp () { return 0; }
+
+  public GLib.TimeSpan get_last_set_timediff () {
+    return this.last_timediff;
+  }
+
+  public void set_last_set_timediff (GLib.TimeSpan span) {
+    this.last_timediff = span;
+  }
 
   [GtkCallback]
   private void menu_button_clicked_cb () {

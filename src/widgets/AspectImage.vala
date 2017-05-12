@@ -29,26 +29,20 @@ class AspectImage : Gtk.Widget {
 
         this.pixbuf_surface = (Cairo.ImageSurface)Gdk.cairo_surface_create_from_pixbuf (value, 1,
                                                                                         this.get_window ());
+        bg_color.alpha = 0.0;
       }
       this.queue_draw ();
     }
   }
-  private double _scale = 1.0;
-  public double scale {
-    get {
-      return _scale;
-    }
+  public string color_string {
     set {
-      if (value > 1.0)
-        value = 1.0;
-
-      this._scale = value;
-      this.queue_resize ();
+      bg_color.parse (value);
     }
   }
 
+  private Gdk.RGBA bg_color;
   private Cairo.Surface? old_surface;
-  private Cairo.ImageSurface pixbuf_surface;
+  private Cairo.ImageSurface? pixbuf_surface = null;
 
 
   public AspectImage () {}
@@ -94,13 +88,8 @@ class AspectImage : Gtk.Widget {
       return;
     }
 
-    double scale_x = width  / (double)pixbuf_surface.get_width ();
-    if (scale_x > 1)
-      scale_x = 1;
-    double final_height = scale_x * pixbuf_surface.get_height ();
-
-    min_height = (int)(final_height * _scale);
-    nat_height = (int)(final_height * _scale);
+    min_height = pixbuf_surface.get_height ();
+    nat_height = pixbuf_surface.get_height ();
   }
 
 
@@ -109,28 +98,17 @@ class AspectImage : Gtk.Widget {
   }
 
   public override bool draw (Cairo.Context ct) {
-    if (this.pixbuf_surface == null)
-      return Gdk.EVENT_PROPAGATE;
-
-
     int width  = get_allocated_width ();
     int height = get_allocated_height ();
 
-    double scale_x = width  / (double)pixbuf_surface.get_width ();
-    double scale_y = scale_x;
-    int y = 0;
+    double scale_x = 1.0;
+    if (bg_color.alpha == 0.0)
+      scale_x = width  / (double)pixbuf_surface.get_width ();
 
-    /* Never scale it vertically down, instead move it up */
-    if (scale_y > 1) {
-      scale_y = 1;
-    }
+    scale_x = double.max (scale_x, 1.0);
 
-    int view_height = (int)(pixbuf_surface.get_height () * scale_y);
-    y = height - view_height;
-
-
-    ct.rectangle (0, 0, width, view_height);
-    ct.scale (scale_x, scale_y);
+    ct.rectangle (0, 0, width, height);
+    ct.scale (scale_x, 1.0);
 
 
     ct.push_group ();
@@ -138,11 +116,19 @@ class AspectImage : Gtk.Widget {
     if (this.old_surface != null) {
       ct.set_source_surface (this.old_surface, 0, 0);
       ct.paint ();
-    } else
+    } else if (bg_color.alpha > 0.0) {
+      ct.set_source_rgba (bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha);
+      ct.fill ();
+    }else
       alpha = 1.0;
 
 
-    ct.set_source_surface (this.pixbuf_surface, 0, 0);
+    if (bg_color.alpha == 0.0) {
+      int x = (int)(width - (pixbuf_surface.get_width () * scale_x)) / 2;
+      ct.set_source_surface (this.pixbuf_surface, x, 0);
+    } else
+      ct.set_source_rgba (bg_color.red, bg_color.green, bg_color.blue, bg_color.alpha);
+
     if (in_transition)
       ct.paint_with_alpha (alpha);
     else

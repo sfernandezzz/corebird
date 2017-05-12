@@ -17,6 +17,7 @@
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/search-page.ui")]
 class SearchPage : IPage, Gtk.Box {
+  public const int KEY_QUERY = 0;
   private const int USER_COUNT = 3;
   /** The unread count here is always zero */
   public int unread_count {
@@ -44,7 +45,7 @@ class SearchPage : IPage, Gtk.Box {
   [GtkChild]
   private ScrollWidget scroll_widget;
   private Gtk.RadioButton radio_button;
-  public DeltaUpdater delta_updater;
+  public Cb.DeltaUpdater delta_updater;
   private GLib.Cancellable? cancellable = null;
   private LoadMoreEntry load_more_entry = new LoadMoreEntry ();
   private string search_query;
@@ -59,15 +60,15 @@ class SearchPage : IPage, Gtk.Box {
   private bool loading_users  = false;
 
 
-  public SearchPage (int id, Account account, DeltaUpdater delta_updater) {
+  public SearchPage (int id, Account account) {
     this.id = id;
     this.account = account;
-    this.delta_updater = delta_updater;
+    this.delta_updater = new Cb.DeltaUpdater (tweet_list);
 
     /* We are slightly abusing the TweetListBox here */
     tweet_list.bind_model (null, null);
     tweet_list.set_header_func (header_func);
-    tweet_list.set_sort_func (ITwitterItem.sort_func);
+    tweet_list.set_sort_func (twitter_item_sort_func);
     tweet_list.row_activated.connect (row_activated_cb);
     tweet_list.retry_button_clicked.connect (retry_button_clicked_cb);
     search_button.clicked.connect (() => {
@@ -94,8 +95,8 @@ class SearchPage : IPage, Gtk.Box {
   /**
    * see IPage#onJoin
    */
-  public void on_join (int page_id, Bundle? args) {
-    string? term = args != null ? args.get_string ("query") : null;
+  public void on_join (int page_id, Cb.Bundle? args) {
+    string? term = args != null ? args.get_string (KEY_QUERY) : null;
 
     if (this.remove_content_timeout != 0) {
       GLib.Source.remove (this.remove_content_timeout);
@@ -113,6 +114,13 @@ class SearchPage : IPage, Gtk.Box {
     }
 
     search_for (term, true);
+  }
+
+  ~SearchPage () {
+    if (this.remove_content_timeout != 0) {
+      GLib.Source.remove (this.remove_content_timeout);
+      this.remove_content_timeout = 0;
+    }
   }
 
   public void on_leave () {
@@ -166,14 +174,14 @@ class SearchPage : IPage, Gtk.Box {
 
   private void row_activated_cb (Gtk.ListBoxRow row) {
     this.last_focus_widget = row;
-    var bundle = new Bundle ();
+    var bundle = new Cb.Bundle ();
     if (row is UserListEntry) {
-      bundle.put_int64 ("user_id", ((UserListEntry)row).user_id);
-      bundle.put_string ("screen_name", ((UserListEntry)row).screen_name);
+      bundle.put_int64 (ProfilePage.KEY_USER_ID, ((UserListEntry)row).user_id);
+      bundle.put_string (ProfilePage.KEY_SCREEN_NAME, ((UserListEntry)row).screen_name);
       main_window.main_widget.switch_page (Page.PROFILE, bundle);
     } else if (row is TweetListEntry) {
-      bundle.put_int ("mode", TweetInfoPage.BY_INSTANCE);
-      bundle.put_object ("tweet", ((TweetListEntry)row).tweet);
+      bundle.put_int (TweetInfoPage.KEY_MODE, TweetInfoPage.BY_INSTANCE);
+      bundle.put_object (TweetInfoPage.KEY_TWEET, ((TweetListEntry)row).tweet);
       main_window.main_widget.switch_page (Page.TWEET_INFO, bundle);
     }
   }
@@ -248,7 +256,7 @@ class SearchPage : IPage, Gtk.Box {
           avatar_url = avatar_url.replace ("_normal", "_bigger");
 
         entry.user_id = user_obj.get_int_member ("id");
-        entry.screen_name = "@" + user_obj.get_string_member ("screen_name");
+        entry.set_screen_name ("@" + user_obj.get_string_member ("screen_name"));
         entry.name = user_obj.get_string_member ("name").strip ();
         entry.avatar_url = avatar_url;
         entry.verified = user_obj.get_boolean_member ("verified");
@@ -283,6 +291,7 @@ class SearchPage : IPage, Gtk.Box {
     call.set_function ("1.1/search/tweets.json");
     call.set_method ("GET");
     call.add_param ("q", this.search_query);
+    call.add_param ("tweet_mode", "extended");
     call.add_param ("max_id", (lowest_tweet_id - 1).to_string ());
     call.add_param ("count", "35");
     TweetUtils.load_threaded.begin (call, cancellable, (_, res) => {
@@ -324,7 +333,6 @@ class SearchPage : IPage, Gtk.Box {
         if (tweet.id < lowest_tweet_id)
           lowest_tweet_id = tweet.id;
         var entry = new TweetListEntry (tweet, main_window, account);
-        delta_updater.add (entry);
         if (!collect_obj.done)
           entry.visible = false;
         else
@@ -353,6 +361,10 @@ class SearchPage : IPage, Gtk.Box {
     tweet_list.@foreach ((w) => w.show());
     this.loading_tweets = false;
     this.loading_users = false;
+
+    /* Work around a problem with GtkListBox where the entries are not redrawn for some reason.
+       This happened whenever we remove_all'd all the rows from the list while it was not mapped */
+    tweet_list.queue_draw ();
   }
 
   public void create_radio_button (Gtk.RadioButton? group){
@@ -374,10 +386,8 @@ class SearchPage : IPage, Gtk.Box {
 }
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/load-more-entry.ui")]
-class LoadMoreEntry : Gtk.ListBoxRow, ITwitterItem {
-  public int64 sort_factor {
-    get { return int64.MAX-2; }
-  }
+class LoadMoreEntry : Gtk.ListBoxRow, Cb.TwitterItem {
+  private GLib.TimeSpan last_timediff;
   public bool seen {
     get { return true; }
     set {}
@@ -392,4 +402,18 @@ class LoadMoreEntry : Gtk.ListBoxRow, ITwitterItem {
     return load_more_button;
   }
   public int update_time_delta (GLib.DateTime? now = null) {return 0;}
+  public int64 get_sort_factor () {
+    return int64.MAX - 2;
+  }
+  public int64 get_timestamp () {
+    return 0;
+  }
+
+  public GLib.TimeSpan get_last_set_timediff () {
+    return this.last_timediff;
+  }
+
+  public void set_last_set_timediff (GLib.TimeSpan span) {
+    this.last_timediff = span;
+  }
 }

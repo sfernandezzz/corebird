@@ -16,7 +16,7 @@
  */
 
 public class TweetListBox : Gtk.ListBox {
-  private Gtk.Stack placeholder;
+  private Gtk.Stack? placeholder = null;
   private Gtk.Label no_entries_label;
 
   private Gtk.Box error_box;
@@ -31,42 +31,51 @@ public class TweetListBox : Gtk.ListBox {
 
   public signal void retry_button_clicked ();
 
-  public unowned DeltaUpdater delta_updater;
+  public Cb.DeltaUpdater delta_updater;
   public unowned Account account;
-  public TweetModel model = new TweetModel ();
+  public Cb.TweetModel model = new Cb.TweetModel ();
+  private Gtk.GestureMultiPress press_gesture;
 
-  public TweetListBox (bool show_placeholder = true) {
-    if (show_placeholder) {
-      add_placeholder ();
-    }
+  public TweetListBox () {
   }
 
 
   construct {
     add_placeholder ();
     this.set_selection_mode (Gtk.SelectionMode.NONE);
-    this.button_press_event.connect (button_press_cb);
+    this.press_gesture = new Gtk.GestureMultiPress (this);
+    this.press_gesture.set_button (0);
+    this.press_gesture.set_propagation_phase (Gtk.PropagationPhase.BUBBLE);
+    this.press_gesture.pressed.connect (gesture_pressed_cb);
+    this.delta_updater = new Cb.DeltaUpdater (this);
     Settings.get ().bind ("double-click-activation",
                           this, "activate-on-single-click",
                           GLib.SettingsBindFlags.INVERT_BOOLEAN);
-    this.bind_model (this.model, (obj) => {
-      assert (obj is Cb.Tweet);
 
-      var row = new TweetListEntry ((Cb.Tweet) obj,
-                                    (MainWindow) get_toplevel (),
-                                    this.account);
-      delta_updater.add (row);
-      row.fade_in ();
-      return row;
-    });
+    Cb.Utils.bind_model (this, this.model, widget_create_func);
   }
 
-  private bool button_press_cb (Gdk.EventButton evt) {
-    if (evt.triggers_context_menu ()) {
+  private Gtk.Widget widget_create_func (GLib.Object obj) {
+    assert (obj is Cb.Tweet);
+
+    var row = new TweetListEntry ((Cb.Tweet) obj,
+                                  (MainWindow) get_toplevel (),
+                                  this.account);
+    row.fade_in ();
+    return row;
+  }
+
+  private void gesture_pressed_cb (int    n_press,
+                                   double x,
+                                   double y) {
+    Gdk.EventSequence sequence = this.press_gesture.get_current_sequence ();
+    Gdk.EventButton event = (Gdk.EventButton)this.press_gesture.get_last_event (sequence);
+
+    if (event.triggers_context_menu ()) {
       /* From gtklistbox.c */
-      Gdk.Window? event_window = evt.window;
+      Gdk.Window? event_window = event.window;
       Gdk.Window window = this.get_window ();
-      double relative_y = evt.y;
+      double relative_y = event.y;
       double parent_y;
 
       while ((event_window != null) && (event_window != window)) {
@@ -83,20 +92,35 @@ public class TweetListBox : Gtk.ListBox {
         }
         tle.toggle_mode ();
         if (tle.shows_actions)
-          this._action_entry = tle;
+          set_action_entry (tle);
         else
-          this._action_entry = null;
-        return true;
+          set_action_entry (null);
+
+        this.press_gesture.set_state (Gtk.EventSequenceState.CLAIMED);
       }
     }
-    return false;
   }
 
+  private void set_action_entry (TweetListEntry? entry) {
+    if (this._action_entry != null) {
+      this._action_entry.destroy.disconnect (action_entry_destroyed_cb);
+      this._action_entry = null;
+    }
+
+    if (entry != null) {
+      this._action_entry = entry;
+      this._action_entry.destroy.connect (action_entry_destroyed_cb);
+    }
+  }
+
+  private void action_entry_destroyed_cb () {
+    this._action_entry = null;
+  }
 
   private void add_placeholder () {
     placeholder = new Gtk.Stack ();
     placeholder.transition_type = Gtk.StackTransitionType.CROSSFADE;
-    var loading_label = new Gtk.Label (_("Loading..."));
+    var loading_label = new Gtk.Label (_("Loading…"));
     loading_label.get_style_context ().add_class ("dim-label");
     placeholder.add_named (loading_label, "spinner");
     no_entries_label  = new Gtk.Label (_("No entries found"));
@@ -107,6 +131,9 @@ public class TweetListBox : Gtk.ListBox {
     error_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 12);
     error_label = new Gtk.Label ("");
     error_label.get_style_context ().add_class ("dim-label");
+    error_label.margin = 12;
+    error_label.selectable = true;
+    error_label.wrap = true;
     retry_button = new Gtk.Button.with_label (_("Retry"));
     retry_button.set_halign (Gtk.Align.CENTER);
     retry_button.clicked.connect (() => {

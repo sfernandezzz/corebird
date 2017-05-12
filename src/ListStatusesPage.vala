@@ -17,6 +17,16 @@
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/list-statuses-page.ui")]
 class ListStatusesPage : ScrollWidget, IPage {
+  public const int KEY_USER_LIST     = 0;
+  public const int KEY_NAME          = 1;
+  public const int KEY_DESCRIPTION   = 2;
+  public const int KEY_CREATOR       = 3;
+  public const int KEY_N_SUBSCRIBERS = 4;
+  public const int KEY_N_MEMBERS     = 5;
+  public const int KEY_CREATED_AT    = 6;
+  public const int KEY_MODE          = 7;
+  public const int KEY_LIST_ID       = 8;
+
   public int id                             { get; set; }
   private unowned MainWindow main_window;
   public unowned MainWindow window {
@@ -74,11 +84,10 @@ class ListStatusesPage : ScrollWidget, IPage {
   private bool loading = false;
 
 
-  public ListStatusesPage (int id, Account account, DeltaUpdater delta_updater) {
+  public ListStatusesPage (int id, Account account) {
     this.id = id;
     this.account = account;
     this.tweet_list.account = account;
-    this.tweet_list.delta_updater = delta_updater;
     this.scroll_event.connect (scroll_event_cb);
     this.scrolled_to_end.connect (load_older);
     this.scrolled_to_start.connect (handle_scrolled_to_start);
@@ -106,23 +115,23 @@ class ListStatusesPage : ScrollWidget, IPage {
    *  - int64 created_at
    *  - string mode
    */
-  public void on_join (int page_id, Bundle? args) {
-    int64 list_id = args.get_int64 ("list_id");
+    public void on_join (int page_id, Cb.Bundle? args) {
+    int64 list_id = args.get_int64 (KEY_LIST_ID);
     if (list_id == 0) {
       list_id = this.list_id;
       return;
       // Continue
     }
 
-    string? list_name = args.get_string ("name");
+    string? list_name = args.get_string (KEY_NAME);
     if (list_name != null) {
-      bool user_list = args.get_bool ("user_list", false);
-      string description = args.get_string ("description");
-      string creator = args.get_string ("creator");
-      int n_subscribers = args.get_int ("n_subscribers");
-      int n_members = args.get_int ("n_members");
-      int64 created_at = args.get_int64 ("created_at");
-      string mode = args.get_string ("mode");
+      bool user_list = args.get_bool (KEY_USER_LIST);
+      string description = args.get_string (KEY_DESCRIPTION);
+      string creator = args.get_string (KEY_CREATOR);
+      int n_subscribers = args.get_int (KEY_N_SUBSCRIBERS);
+      int n_members = args.get_int (KEY_N_MEMBERS);
+      int64 created_at = args.get_int64 (KEY_CREATED_AT);
+      string mode = args.get_string (KEY_MODE);
 
       delete_button.sensitive = user_list;
       edit_button.sensitive = user_list;
@@ -157,6 +166,7 @@ class ListStatusesPage : ScrollWidget, IPage {
     uint requested_tweet_count = 25;
     var call = account.proxy.new_call ();
     call.set_function ("1.1/lists/statuses.json");
+    call.add_param ("tweet_mode", "extended");
     call.set_method ("GET");
     debug ("USING LIST ID %s", list_id.to_string ());
     call.add_param ("list_id", list_id.to_string ());
@@ -180,9 +190,9 @@ class ListStatusesPage : ScrollWidget, IPage {
       loading = false;
       return;
     }
-    yield TweetUtils.work_array (root_array,
-                                 tweet_list,
-                                 account);
+    TweetUtils.work_array (root_array,
+                           tweet_list,
+                           account);
 
     loading = false;
   }
@@ -195,9 +205,10 @@ class ListStatusesPage : ScrollWidget, IPage {
     uint requested_tweet_count = 25;
     var call = account.proxy.new_call ();
     call.set_function ("1.1/lists/statuses.json");
+    call.add_param ("tweet_mode", "extended");
     call.set_method ("GET");
     call.add_param ("list_id", list_id.to_string ());
-    call.add_param ("max_id", (tweet_list.model.lowest_id -1).to_string ());
+    call.add_param ("max_id", (tweet_list.model.min_id -1).to_string ());
     call.add_param ("count", requested_tweet_count.to_string ());
 
     Json.Node? root = null;
@@ -209,9 +220,9 @@ class ListStatusesPage : ScrollWidget, IPage {
     }
 
     var root_array = root.get_array ();
-    yield TweetUtils.work_array (root_array,
-                                 tweet_list,
-                                 account);
+    TweetUtils.work_array (root_array,
+                           tweet_list,
+                           account);
     loading = false;
   }
 
@@ -287,9 +298,9 @@ class ListStatusesPage : ScrollWidget, IPage {
       }
     });
     // Go back to the ListsPage and tell it to remove this list
-    var bundle = new Bundle ();
-    bundle.put_int ("mode", ListsPage.MODE_DELETE);
-    bundle.put_int64 ("list_id", list_id);
+    var bundle = new Cb.Bundle ();
+    bundle.put_int (ListsPage.KEY_MODE, ListsPage.MODE_DELETE);
+    bundle.put_int64 (ListsPage.KEY_LIST_ID, list_id);
     main_window.main_widget.switch_page (Page.LISTS, bundle);
   }
 
@@ -304,9 +315,9 @@ class ListStatusesPage : ScrollWidget, IPage {
   [GtkCallback]
   private void tweet_activated_cb (Gtk.ListBoxRow row) {
     if (row is TweetListEntry) {
-      var bundle = new Bundle ();
-      bundle.put_int ("mode", TweetInfoPage.BY_INSTANCE);
-      bundle.put_object ("tweet", ((TweetListEntry)row).tweet);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int (TweetInfoPage.KEY_MODE, TweetInfoPage.BY_INSTANCE);
+      bundle.put_object (TweetInfoPage.KEY_TWEET, ((TweetListEntry)row).tweet);
       main_window.main_widget.switch_page (Page.TWEET_INFO, bundle);
     } else
       warning ("row is of unknown type");
@@ -318,7 +329,7 @@ class ListStatusesPage : ScrollWidget, IPage {
     call.set_method ("GET");
     call.add_param ("list_id", list_id.to_string ());
     call.add_param ("count", "30");
-    int64 since_id = tweet_list.model.greatest_id;
+    int64 since_id = tweet_list.model.max_id;
     if (since_id < 0)
       since_id = 1;
 
@@ -336,9 +347,9 @@ class ListStatusesPage : ScrollWidget, IPage {
 
     var root_array = root.get_array ();
     if (root_array.get_length () > 0) {
-      yield TweetUtils.work_array (root_array,
-                                   tweet_list,
-                                   account);
+      TweetUtils.work_array (root_array,
+                             tweet_list,
+                             account);
     }
   }
 

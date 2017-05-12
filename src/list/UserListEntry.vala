@@ -16,7 +16,7 @@
  */
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/user-list-entry.ui")]
-class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
+class UserListEntry : Gtk.ListBoxRow, Cb.TwitterItem {
   [GtkChild]
   private Gtk.Label name_label;
   [GtkChild]
@@ -35,10 +35,12 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
   }
 
   public string screen_name {
-    set { screen_name_label.label = value; }
     owned get {
       return screen_name_label.label.substring (1);
     }
+  }
+  public void set_screen_name (string sn) {
+    screen_name_label.label = sn;
   }
 
   public string avatar_url {
@@ -60,10 +62,6 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
     set {}
   }
 
-  public int64 sort_factor {
-    get{ return int64.MAX-1; }
-  }
-
   public bool show_settings {
     set {
       settings_button.visible = value;
@@ -73,6 +71,7 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
   }
 
   public int64 user_id { get; set; }
+  private GLib.TimeSpan last_timediff;
 
   public signal void action_clicked ();
 
@@ -80,18 +79,18 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
   private unowned Account account;
 
   public UserListEntry.from_account (Account acc) {
-    this.screen_name = "@" + acc.screen_name;
+    this.screen_name_label.label = "@" + acc.screen_name;
     this.name = acc.name;
     this.avatar_surface = acc.avatar;
     this.account = acc;
     this.user_id = acc.id;
     acc.info_changed.connect ((screen_name, name, nop, avatar) => {
-      this.screen_name = "@" + screen_name;
+      this.screen_name_label.label = "@" + acc.screen_name;
       this.name = name;
       this.avatar_surface = avatar;
     });
     acc.notify["avatar"].connect (() => {
-      this.avatar_surface = acc.avatar;
+      this.avatar_surface = this.account.avatar;
     });
     var cb = (Corebird) GLib.Application.get_default ();
     cb.window_added.connect ((window) => {
@@ -118,12 +117,26 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
   }
 
   private void real_set_avatar (string avatar_url) {
-    avatar_image.surface = Twitter.get ().get_avatar (user_id, avatar_url, (a) => {
-      avatar_image.surface = a;
-    }, 48 * this.get_scale_factor ());
+    Twitter.get ().get_avatar.begin (user_id, avatar_url, avatar_image, 48 * this.get_scale_factor ());
   }
 
   public int update_time_delta (GLib.DateTime? now = null) {return 0;}
+
+  public int64 get_sort_factor () {
+    return int64.MAX - 1;
+  }
+
+  public int64 get_timestamp () {
+    return 0;
+  }
+
+  public GLib.TimeSpan get_last_set_timediff () {
+    return this.last_timediff;
+  }
+
+  public void set_last_set_timediff (GLib.TimeSpan span) {
+    this.last_timediff = span;
+  }
 
   private void update_window_button_sensitivity (Gtk.Window window, bool new_value) {
     if (((MainWindow)window).account.screen_name == this.account.screen_name) {
@@ -156,9 +169,9 @@ class UserListEntry : Gtk.ListBoxRow, ITwitterItem {
     var active_window = ((Gtk.Application)GLib.Application.get_default ()).active_window;
     if (active_window is MainWindow) {
       var mw = (MainWindow) active_window;
-      var bundle = new Bundle ();
-      bundle.put_int64 ("user_id", this.user_id);
-      bundle.put_string ("screen_name", this.screen_name);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (ProfilePage.KEY_USER_ID, this.user_id);
+      bundle.put_string (ProfilePage.KEY_SCREEN_NAME, this.screen_name);
       mw.main_widget.switch_page (Page.PROFILE, bundle);
     }
   }

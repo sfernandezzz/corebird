@@ -22,13 +22,16 @@ private class MediaButton : Gtk.Widget {
   private const int MIN_HEIGHT     = 40;
   private const int MIN_WIDTH      = 40;
   private Gdk.Window? event_window = null;
-  private unowned Cb.Media? _media;
+  private Cb.Media? _media = null;
   private static Cairo.Surface[] play_icons;
-  public unowned Cb.Media? media {
+  public Cb.Media? media {
     get {
       return _media;
     }
     set {
+      if (_media != null) {
+        _media.progress.disconnect (media_progress_cb);
+      }
       _media = value;
       if (value != null) {
         if (!media.loaded) {
@@ -36,6 +39,9 @@ private class MediaButton : Gtk.Widget {
         } else {
           this.media_alpha = 1.0;
         }
+        bool is_m3u8 = _media.url.has_suffix (".m3u8");
+        ((GLib.SimpleAction)actions.lookup_action ("save-as")).set_enabled (!is_m3u8);
+
       }
       if (value != null && (value.type == Cb.MediaType.IMAGE ||
                             value.type == Cb.MediaType.GIF)) {
@@ -49,7 +55,8 @@ private class MediaButton : Gtk.Widget {
   private GLib.SimpleActionGroup actions;
   private const GLib.ActionEntry[] action_entries = {
     {"copy-url",        copy_url_activated},
-    {"open-in-browser", open_in_browser_activated}
+    {"open-in-browser", open_in_browser_activated},
+    {"save-as",         save_as_activated},
   };
   private Pango.Layout layout;
   private Gtk.GestureMultiPress press_gesture;
@@ -78,6 +85,12 @@ private class MediaButton : Gtk.Widget {
     this.set_can_focus (true);
   }
 
+  ~MediaButton () {
+    if (_media != null) {
+      _media.progress.disconnect (media_progress_cb);
+    }
+  }
+
   public MediaButton (Cb.Media? media, bool restrict_height = false) {
     this.media = media;
     this.restrict_height = restrict_height;
@@ -90,19 +103,27 @@ private class MediaButton : Gtk.Widget {
     this.menu_model = new GLib.Menu ();
     menu_model.append (_("Open in Browser"), "media.open-in-browser");
 
+    menu_model.append (_("Save as…"), "media.save-as");
+
     this.layout = this.create_pango_layout ("0%");
     this.press_gesture = new Gtk.GestureMultiPress (this);
     this.press_gesture.set_exclusive (true);
     this.press_gesture.set_button (0);
+    this.press_gesture.set_propagation_phase (Gtk.PropagationPhase.CAPTURE);
+    this.press_gesture.released.connect (gesture_released_cb);
     this.press_gesture.pressed.connect (gesture_pressed_cb);
   }
 
   private void media_progress_cb () {
     this.queue_draw ();
 
-    if (this._media.percent_loaded >= 100) {
+    if (this._media.loaded) {
       if (!_media.invalid && _media.surface != null) {
         this.start_fade ();
+      } else {
+        /* Invalid media. */
+        this.hide ();
+        this.set_sensitive (false);
       }
 
       this.queue_resize ();
@@ -240,6 +261,51 @@ private class MediaButton : Gtk.Widget {
     } catch (GLib.Error e) {
       critical (e.message);
     }
+  }
+
+  private void save_as_activated (GLib.SimpleAction a, GLib.Variant? v) {
+    string title;
+    if (_media.is_video ())
+      title = _("Save Video");
+    else
+      title = _("Save Image");
+
+    var filechooser = new Gtk.FileChooserDialog (title,
+                                                 this.window,
+                                                 Gtk.FileChooserAction.SAVE,
+                                                 _("Cancel"),
+                                                 Gtk.ResponseType.CANCEL,
+                                                 _("Save"),
+                                                 Gtk.ResponseType.ACCEPT);
+
+    filechooser.set_current_name (Utils.get_media_display_name (_media));
+    filechooser.response.connect ((id) => {
+      if (id == Gtk.ResponseType.ACCEPT) {
+        var file = GLib.File.new_for_path (filechooser.get_filename ());
+        // Download the file
+        Utils.get_media_display_name (_media);
+        string url = _media.target_url ?? _media.url;
+        debug ("Downloading %s to %s", url, filechooser.get_filename ());
+
+        GLib.OutputStream? out_stream = null;
+        try {
+          out_stream = file.create (0, null);
+        } catch (GLib.Error e) {
+          Utils.show_error_dialog (e.message, this.window);
+          warning (e.message);
+        }
+
+        if (out_stream != null) {
+          Utils.download_file.begin (url, out_stream, () => {
+            debug ("Download of %s finished", url);
+          });
+        }
+      }
+
+      filechooser.destroy ();
+    });
+
+    filechooser.show_all ();
   }
 
   public override Gtk.SizeRequestMode get_request_mode () {
@@ -413,7 +479,6 @@ private class MediaButton : Gtk.Widget {
   private void gesture_pressed_cb (int    n_press,
                                    double x,
                                    double y) {
-
     Gdk.EventSequence sequence = this.press_gesture.get_current_sequence ();
     Gdk.Event event = this.press_gesture.get_last_event (sequence);
     uint button = this.press_gesture.get_current_button ();
@@ -421,10 +486,7 @@ private class MediaButton : Gtk.Widget {
     if (this._media == null)
       return;
 
-    if (button == Gdk.BUTTON_PRIMARY) {
-      this.press_gesture.set_state (Gtk.EventSequenceState.CLAIMED);
-      this.clicked (this);
-    } else if (event.triggers_context_menu ()) {
+    if (event.triggers_context_menu ()) {
       this.press_gesture.set_state (Gtk.EventSequenceState.CLAIMED);
 
       if (this.menu == null) {
@@ -433,8 +495,22 @@ private class MediaButton : Gtk.Widget {
       }
       menu.show_all ();
       menu.popup (null, null, null, button, Gtk.get_current_event_time ());
-    } else {
-      this.press_gesture.set_state (Gtk.EventSequenceState.DENIED);
+    }
+  }
+
+  private void gesture_released_cb (int    n_press,
+                                    double x,
+                                    double y) {
+    Gdk.EventSequence sequence = this.press_gesture.get_current_sequence ();
+    Gdk.Event event = this.press_gesture.get_last_event (sequence);
+    uint button = this.press_gesture.get_current_button ();
+
+    if (this._media == null || event == null)
+      return;
+
+    if (button == Gdk.BUTTON_PRIMARY) {
+      this.press_gesture.set_state (Gtk.EventSequenceState.CLAIMED);
+      this.clicked (this);
     }
   }
 
@@ -448,6 +524,3 @@ private class MediaButton : Gtk.Widget {
     return Gdk.EVENT_PROPAGATE;
   }
 }
-
-
-

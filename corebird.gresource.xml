@@ -30,7 +30,6 @@
     <file preprocess="xml-stripblanks">ui/main-widget.ui</file>
     <file preprocess="xml-stripblanks">ui/account-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/media-dialog.ui</file>
-    <file preprocess="xml-stripblanks">ui/image-crop-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/modify-snippet-dialog.ui</file>
     <file preprocess="xml-stripblanks">ui/shortcuts-window.ui</file>
     <file preprocess="to-pixdata">data/16x16/apps/corebird-compose-symbolic.symbolic.png</file>
@@ -41,6 +40,7 @@
     <file preprocess="to-pixdata">data/16x16/apps/corebird-new-window-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/16x16/apps/corebird-retweet-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/16x16/apps/corebird-profile-symbolic.symbolic.png</file>
+    <file preprocess="to-pixdata">data/16x16/apps/corebird-favorite-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/32x32/apps/corebird-compose-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/32x32/apps/corebird-conversation-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/32x32/apps/corebird-dms-symbolic.symbolic.png</file>
@@ -49,6 +49,7 @@
     <file preprocess="to-pixdata">data/32x32/apps/corebird-new-window-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/32x32/apps/corebird-retweet-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/32x32/apps/corebird-profile-symbolic.symbolic.png</file>
+    <file preprocess="to-pixdata">data/32x32/apps/corebird-favorite-symbolic.symbolic.png</file>
     <file preprocess="to-pixdata">data/play.png</file>
     <file preprocess="to-pixdata">data/play@2.png</file>
     <file preprocess="to-pixdata">data/verified-small.png</file>

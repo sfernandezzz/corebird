@@ -43,6 +43,18 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
   private ComposeImageManager compose_image_manager;
   [GtkChild]
   private Gtk.Button add_image_button;
+  [GtkChild]
+  private Gtk.Stack stack;
+  [GtkChild]
+  private Gtk.Grid image_error_grid;
+  [GtkChild]
+  private Gtk.Label image_error_label;
+  [GtkChild]
+  private Gtk.Button cancel_button;
+  [GtkChild]
+  private Gtk.FlowBox fav_image_list;
+  [GtkChild]
+  private Gtk.Button fav_image_button;
   private unowned Account account;
   private unowned Cb.Tweet reply_to;
   private Mode mode;
@@ -63,17 +75,15 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
 
     avatar_image.surface = acc.avatar;
     acc.notify["avatar"].connect (() => {
-      avatar_image.surface = acc.avatar;
+      avatar_image.surface = account.avatar;
     });
 
-    if (mode != Mode.QUOTE)
-      length_label.label = Cb.Tweet.MAX_LENGTH.to_string ();
-    else
-      length_label.label = (Cb.Tweet.MAX_LENGTH - Twitter.short_url_length_https).to_string ();
+    /* Just use recalc_tweet_length here so we have a central place where we update the
+       send_button sensitivity */
+    GLib.NetworkMonitor.get_default ().notify["network-available"].connect (recalc_tweet_length);
 
-
+    length_label.label = Cb.Tweet.MAX_LENGTH.to_string ();
     tweet_text.buffer.changed.connect (recalc_tweet_length);
-
 
     if (parent != null) {
       this.set_transient_for (parent);
@@ -92,38 +102,11 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
       content_grid.attach (reply_list, 0, 0, 2, 1);
     }
 
-    if (mode == Mode.REPLY) {
-      StringBuilder mention_builder = new StringBuilder ();
-      if (reply_to.get_screen_name () != account.screen_name) {
-        mention_builder.append ("@").append (reply_to.get_screen_name ());
-      }
-
-      if (reply_to.retweeted_tweet != null) {
-        if (mention_builder.len > 0)
-          mention_builder.append (" ");
-
-        mention_builder.append ("@").append (reply_to.source_tweet.author.screen_name);
-      }
-
-      foreach (unowned string s in reply_to.get_mentions ()) {
-        if (s == "@" + account.screen_name ||
-            s == "@" + reply_to.get_screen_name () ||
-            (reply_to.retweeted_tweet != null && reply_to.source_tweet.author.screen_name != s))
-          continue;
-
-        if (mention_builder.len > 0)
-          mention_builder.append (" ");
-
-        mention_builder.append (s);
-      }
-      /* Only add a space if we actually added some screen names */
-      if (mention_builder.len > 0)
-        mention_builder.append (" ");
-
-      tweet_text.buffer.text = mention_builder.str;
-    } else if (mode == Mode.QUOTE) {
+    if (mode == Mode.QUOTE) {
       assert (reply_to != null);
       this.title_label.label = _("Quote tweet");
+      add_image_button.sensitive = false;
+      fav_image_button.sensitive = false;
     }
 
     /* Let the text view immediately grab the keyboard focus */
@@ -135,11 +118,15 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
         () => {start_send_tweet (); return true;});
 
     this.compose_image_manager.image_removed.connect (() => {
-      if (this.compose_image_manager.n_images < Twitter.max_media_per_upload)
+      if (!this.compose_image_manager.full) {
         this.add_image_button.sensitive = true;
+        this.fav_image_button.sensitive = true;
+      }
 
-      if (this.compose_image_manager.n_images == 0)
+      if (this.compose_image_manager.n_images == 0) {
         this.compose_image_manager.hide ();
+        this.enable_fav_gifs ();
+      }
     });
 
     this.add_accel_group (ag);
@@ -151,29 +138,34 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
     }
 
 
+    var image_target_list = new Gtk.TargetList (null);
+    image_target_list.add_text_targets (0);
+
+    Gtk.drag_dest_set (fav_image_list,
+                       Gtk.DestDefaults.ALL,
+                       null,
+                       Gdk.DragAction.COPY);
+    Gtk.drag_dest_set_target_list (fav_image_list, image_target_list);
+
     this.set_default_size (DEFAULT_WIDTH, (int)(DEFAULT_WIDTH / 2.5));
   }
+
+
 
   private void recalc_tweet_length () {
     Gtk.TextIter start, end;
     tweet_text.buffer.get_bounds (out start, out end);
     string text = tweet_text.buffer.get_text (start, end, true);
 
-    int media_count = 0;
-    if (compose_image_manager.n_images > 0)
-      media_count = 1;
-
-    int length = TweetUtils.calc_tweet_length (text, media_count);
-
-    if (this.mode == Mode.QUOTE)
-      length += 1 + Twitter.short_url_length_https; //Quoting will add a space and then the tweet's URL
-
+    int length = TweetUtils.calc_tweet_length (text);
 
     length_label.label = (Cb.Tweet.MAX_LENGTH - length).to_string ();
-    if (length > 0 && length <= Cb.Tweet.MAX_LENGTH)
-      send_button.sensitive = true;
-    else
+    if (length > 0 && length <= Cb.Tweet.MAX_LENGTH) {
+      bool network_reachable = GLib.NetworkMonitor.get_default ().network_available;
+      send_button.sensitive = network_reachable;
+    } else {
       send_button.sensitive = false;
+    }
   }
 
   [GtkCallback]
@@ -193,7 +185,10 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
     title_spinner.start ();
     send_button.sensitive = false;
     tweet_text.sensitive = false;
-    content_grid.sensitive = false;
+    fav_image_button.sensitive = false;
+    add_image_button.sensitive = false;
+    compose_image_manager.sensitive = false;
+
 
     Gtk.TextIter start, end;
     tweet_text.buffer.get_start_iter (out start);
@@ -208,10 +203,15 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
       this.compose_image_manager.start_progress (path);
     });
 
+    job.image_progress.connect ((path, progress) => {
+      this.compose_image_manager.set_image_progress (path, progress);
+    });
+
     job.image_upload_finished.connect ((path, error_msg) => {
       this.compose_image_manager.end_progress (path, error_msg);
     });
 
+    this.compose_image_manager.upload_started = true;
     job.start.begin (cancellable, (obj, res) => {
       bool success = job.start.end (res);
       debug ("Tweet sent.");
@@ -234,17 +234,31 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
   }
 
   [GtkCallback]
-  private void cancel_clicked (Gtk.Widget source) {
+  private void cancel_clicked () {
     if (this.cancellable != null)
       this.cancellable.cancel ();
 
-     this.save_last_tweet ();
-    destroy ();
+    if (stack.visible_child == image_error_grid ||
+        stack.visible_child_name == "fav-images") {
+      stack.visible_child = content_grid;
+      cancel_button.label = _("Cancel");
+      /* Use this instead of just setting send_button.sensitive to true to avoid
+         sending tweets with 0 length */
+      this.recalc_tweet_length ();
+    } else {
+      this.save_last_tweet ();
+      destroy ();
+    }
   }
 
   private bool escape_pressed_cb () {
-    this.save_last_tweet ();
-    this.destroy ();
+
+    if (stack.visible_child_name == "fav-images") {
+      stack.visible_child = content_grid;
+    } else {
+      this.save_last_tweet ();
+      this.destroy ();
+    }
     return Gdk.EVENT_STOP;
   }
 
@@ -254,18 +268,224 @@ class ComposeTweetWindow : Gtk.ApplicationWindow {
 
   [GtkCallback]
   private void add_image_clicked_cb (Gtk.Button source) {
-    var file_chooser = new FileSelector ();
-    file_chooser.set_transient_for (this);
-    file_chooser.modal = true;
-    file_chooser.file_selected.connect ((path, image) => {
-      this.compose_image_manager.show ();
-      this.compose_image_manager.load_image (path, image);
+    var filechooser = new Gtk.FileChooserDialog (_("Select Image"),
+                                                 this,
+                                                 Gtk.FileChooserAction.OPEN,
+                                                 _("Cancel"),
+                                                 Gtk.ResponseType.CANCEL,
+                                                 _("Open"),
+                                                 Gtk.ResponseType.ACCEPT);
+    filechooser.select_multiple = false;
+    filechooser.modal = true;
 
-      if (this.compose_image_manager.n_images == Twitter.max_media_per_upload)
-        this.add_image_button.sensitive = false;
-      file_chooser.close ();
+    filechooser.response.connect ((id) => {
+      var filename = filechooser.get_filename ();
+      if (id == Gtk.ResponseType.ACCEPT) {
+        debug ("Loading %s", filename);
+
+        /* Get file size */
+        var file = GLib.File.new_for_path (filename);
+        GLib.FileInfo info;
+        try {
+          info = file.query_info (GLib.FileAttribute.STANDARD_TYPE + "," +
+                                  GLib.FileAttribute.STANDARD_SIZE, 0);
+        } catch (GLib.Error e) {
+          warning ("%s (%s)", e.message, filename);
+          // TODO: Proper error checking
+          return;
+        }
+
+        if (info.get_size () > Twitter.MAX_BYTES_PER_IMAGE) {
+          stack.visible_child = image_error_grid;
+          image_error_label.label = _("The selected image is too big. The maximum file size per image is %'d MB")
+                                    .printf (Twitter.MAX_BYTES_PER_IMAGE / 1024 / 1024);
+          cancel_button.label = _("Back");
+          send_button.sensitive = false;
+        } else if (filename.has_suffix (".gif") &&
+                   this.compose_image_manager.n_images > 0) {
+          stack.visible_child = image_error_grid;
+          image_error_label.label = _("Only one GIF file per tweet is allowed.");
+          cancel_button.label = _("Back");
+          send_button.sensitive = false;
+        } else {
+          this.compose_image_manager.show ();
+          this.compose_image_manager.load_image (filename, null);
+          if (this.compose_image_manager.n_images > 0) {
+            this.disable_fav_gifs ();
+          }
+          if (this.compose_image_manager.full) {
+            this.add_image_button.sensitive = false;
+            this.fav_image_button.sensitive = false;
+          }
+        }
+      }
+      filechooser.destroy ();
     });
 
-    file_chooser.show_all ();
+    var filter = new Gtk.FileFilter ();
+    filter.add_mime_type ("image/png");
+    filter.add_mime_type ("image/jpeg");
+    filter.add_mime_type ("image/gif");
+    filechooser.set_filter (filter);
+
+    filechooser.show_all ();
+  }
+
+  [GtkCallback]
+  public void fav_image_button_clicked_cb () {
+    cancel_button.label = _("Back");
+    stack.visible_child_name = "fav-images";
+    this.load_fav_images ();
+  }
+
+  private void load_fav_images () {
+    if (fav_image_list.get_children ().length () > 0)
+      return;
+
+    const int MAX_IMAGES = 50;
+    string fav_image_dir = Dirs.config ("image-favorites/");
+    try {
+      var dir = File.new_for_path (fav_image_dir);
+      var iter = dir.enumerate_children ("standard::display-name,standard::content-type",
+                                         GLib.FileQueryInfoFlags.NONE);
+
+      int i = 0;
+      FileInfo? info = null;
+      while ((info = iter.next_file ()) != null) {
+        var content_type = info.get_content_type ();
+
+        if (content_type == "image/jpeg" ||
+            content_type == "image/png" ||
+            content_type == "image/gif") {
+          var file = dir.get_child (info.get_name ());
+          var row = new FavImageRow (file.get_path ());
+          if (this.compose_image_manager.n_images > 0)
+            row.set_sensitive (false);
+
+          row.show_all ();
+          fav_image_list.add (row);
+
+          i ++;
+          if (i >= MAX_IMAGES)
+            break;
+        }
+      }
+    } catch (GLib.Error e) {
+      warning (e.message);
+    }
+  }
+
+  [GtkCallback]
+  private void new_fav_image_button_clicked_cb () {
+    var filechooser = new Gtk.FileChooserDialog (_("Select Image"),
+                                                 this,
+                                                 Gtk.FileChooserAction.OPEN,
+                                                 _("Cancel"),
+                                                 Gtk.ResponseType.CANCEL,
+                                                 _("Open"),
+                                                 Gtk.ResponseType.ACCEPT);
+    filechooser.select_multiple = false;
+    filechooser.modal = true;
+
+    filechooser.response.connect ((id) => {
+      if (id == Gtk.ResponseType.ACCEPT) {
+        try {
+          /* First, take the selected file and copy it into the image-favorites folder */
+          var file = GLib.File.new_for_path (filechooser.get_filename ());
+          var file_info = file.query_info ("standard::name", GLib.FileQueryInfoFlags.NONE);
+          var dest_dir = GLib.File.new_for_path (Dirs.config ("image-favorites"));
+
+          /* Explicitly check whether the destination file already exists, and rename
+             it if it does */
+          var dest_file = dest_dir.get_child (file_info.get_name ());
+          if (GLib.FileUtils.test (dest_file.get_path (), GLib.FileTest.EXISTS)) {
+            debug ("File '%s' already exists", dest_file.get_path ());
+            dest_file = dest_dir.get_child ("%s_%s".printf (GLib.get_monotonic_time ().to_string (),
+                                                            file_info.get_name ()));
+            debug ("New name: '%s'", dest_file.get_path ());
+          }
+
+          file.copy (dest_file, GLib.FileCopyFlags.NONE);
+
+          var row = new FavImageRow (dest_file.get_path ());
+          if (this.compose_image_manager.n_images > 0)
+            row.set_sensitive (false);
+
+          row.show_all ();
+          fav_image_list.add (row);
+
+        } catch (GLib.Error e) {
+          warning (e.message);
+        }
+      }
+      filechooser.destroy ();
+    });
+
+    var filter = new Gtk.FileFilter ();
+    filter.add_mime_type ("image/png");
+    filter.add_mime_type ("image/jpeg");
+    filter.add_mime_type ("image/gif");
+    filechooser.set_filter (filter);
+
+    filechooser.show_all ();
+  }
+
+  [GtkCallback]
+  private void fav_image_box_child_activated_cb (Gtk.FlowBoxChild _child) {
+    FavImageRow child = (FavImageRow) _child;
+
+    cancel_clicked ();
+    this.compose_image_manager.show ();
+    this.compose_image_manager.load_image (child.get_image_path (), null);
+    if (this.compose_image_manager.full) {
+      this.add_image_button.sensitive = false;
+      this.fav_image_button.sensitive = false;
+    }
+
+    if (this.compose_image_manager.n_images > 0)
+      this.disable_fav_gifs ();
+  }
+
+  [GtkCallback]
+  private void fav_image_box_drag_data_received_cb (Gdk.DragContext   context,
+                                                    int               x,
+                                                    int               y,
+                                                    Gtk.SelectionData selection_data,
+                                                    uint              info,
+                                                    uint              time) {
+    if (info == 0) {
+      /* Text */
+      string? text = selection_data.get_text ().strip ();
+      if (text.has_prefix ("file://")) {
+        var row = new FavImageRow (GLib.File.new_for_uri (text).get_path ());
+        if (this.compose_image_manager.n_images > 0)
+          row.set_sensitive (false);
+
+        row.show_all ();
+        fav_image_list.add (row);
+      } else {
+        debug ("Can't handle '%s'", text);
+      }
+    } else {
+      warning ("Unknown drag data info %u", info);
+    }
+  }
+
+  private void disable_fav_gifs () {
+    foreach (var child in this.fav_image_list.get_children ()) {
+      var btn = (FavImageRow) child;
+      if (btn.get_image_path ().down ().has_suffix (".gif")) {
+        btn.set_sensitive (false);
+      }
+    }
+  }
+
+  private void enable_fav_gifs () {
+    foreach (var child in this.fav_image_list.get_children ()) {
+      var btn = (FavImageRow) child;
+      if (btn.get_image_path ().down ().has_suffix (".gif")) {
+        btn.set_sensitive (true);
+      }
+    }
   }
 }

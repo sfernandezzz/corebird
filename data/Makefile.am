@@ -1,5 +1,5 @@
 iconprefix=$(datarootdir)/icons/hicolor/
-SUBDIRS = 256x256 128x128 96x96 64x64 48x48 32x32 24x24 16x16
+SUBDIRS = hicolor
 
 desktopdir = $(datarootdir)/applications
 desktop_in_files = org.baedert.corebird.desktop.in
@@ -16,14 +16,6 @@ appdata_DATA = $(appdata_in_files:.xml.in=.xml)
 %.appdata.xml: %.appdata.xml.in
 	msgfmt --xml -d $(top_srcdir)/po \
 	--template $< -o $@
-
-# Actually, just ignore gschema translations...
-org.baedert.corebird.gschema.xml: org.baedert.corebird.gschema.xml.in
-	cp $^ $@
-#%.gschema.xml: %.gschema.xml.in
-#	msgfmt --xml -d $(top_srcdir)/po \
-#	--template $< -o $@
-
 
 man_MANS = corebird.1
 
@@ -47,11 +39,10 @@ org.baedert.corebird.service: Makefile
 EXTRA_DIST = \
 	$(desktop_in_files) \
 	$(appdata_in_files) \
-	org.baedert.corebird.gschema.xml.in \
+	org.baedert.corebird.gschema.xml \
 	$(man_MANS)
 
 CLEANFILES = \
-	$(gsettings_SCHEMAS) \
 	gschemas.compiled \
 	org.baedert.corebird.gschema.valid \
 	$(desktop_DATA) \

@@ -24,7 +24,6 @@
     <property name="title">Corebird</property>
     <property name="icon-name">corebird</property>
     <property name="show-menubar">false</property>
-    <signal name="button-press-event" handler="button_press_event_cb" swapped="no"/>
     <signal name="delete_event" handler="window_delete_cb" swapped="no"/>
     <child type="titlebar">
       <object class="GtkHeaderBar" id="headerbar">
@@ -70,10 +69,9 @@
                 <child>
                   <object class="AvatarWidget" id="avatar_image">
                     <property name="visible">True</property>
+                    <property name="size">24</property>
                     <property name="can-focus">False</property>
                     <property name="valign">center</property>
-                    <property name="width-request">24</property>
-                    <property name="height-request">24</property>
                   </object>
                 </child>
               </object>

@@ -16,9 +16,16 @@
  */
 
 class CompletionTextView : Gtk.TextView {
+  private const string[] TEXT_TAGS = {
+    "link",
+    "mention",
+    "hashtag",
+    "snippet"
+  };
   private Gtk.ListBox completion_list;
   private Gtk.Window completion_window;
   private int current_match = 0;
+  private string? current_word = null;
 
 
   private unowned Account account;
@@ -65,18 +72,20 @@ class CompletionTextView : Gtk.TextView {
 
     Gdk.RGBA snippet_color = { 0.0, 0.65, 0.0627, 1.0};
 
-    this.buffer.create_tag ("link",
+    this.buffer.create_tag (TEXT_TAGS[0],
                             "foreground_rgba",
                             link_color, null);
-    this.buffer.create_tag ("mention",
+    this.buffer.create_tag (TEXT_TAGS[1],
                             "foreground_rgba",
                             link_color, null);
-    this.buffer.create_tag ("hashtag",
+    this.buffer.create_tag (TEXT_TAGS[2],
                             "foreground_rgba",
                             link_color, null);
-    this.buffer.create_tag ("snippet",
+    this.buffer.create_tag (TEXT_TAGS[3],
                             "foreground_rgba",
                             snippet_color, null);
+    /* gspell marker */
+    this.buffer.create_tag (TweetUtils.NO_SPELL_CHECK, null);
 
     this.buffer.notify["cursor-position"].connect (update_completion);
     this.buffer.changed.connect (buffer_changed_cb);
@@ -87,6 +96,17 @@ class CompletionTextView : Gtk.TextView {
     this.left_margin   = 6;
     this.top_margin    = 6;
     this.bottom_margin = 6;
+
+#if SPELLCHECK
+    var gspell_view = Gspell.TextView.get_from_gtk_text_view (this);
+    gspell_view.set_inline_spell_checking (true);
+    /* Disabled until we can rely on gspell 1.2
+       gspell_view.set_enable_language_menu (true); */
+
+    var gspell_buffer = Gspell.TextBuffer.get_from_gtk_text_buffer (this.buffer);
+    var checker = new Gspell.Checker (Gspell.Language.get_default ());
+    gspell_buffer.set_spell_checker (checker);
+#endif
   }
 
   public void set_account (Account account) {
@@ -170,10 +190,10 @@ class CompletionTextView : Gtk.TextView {
       string compl = ((Gtk.Label)(((Gtk.ListBoxRow)row).get_child ())).label;
       insert_completion (compl.substring (1));
       current_match = -1;
-      completion_window.hide ();
+      hide_completion_window ();
       return Gdk.EVENT_STOP;
     } else if (evt.keyval == Gdk.Key.Escape) {
-      completion_window.hide ();
+      hide_completion_window ();
       return Gdk.EVENT_STOP;
     }
 
@@ -186,15 +206,24 @@ class CompletionTextView : Gtk.TextView {
     Gtk.TextIter? end_iter;
     this.buffer.get_start_iter (out start_iter);
     this.buffer.get_end_iter (out end_iter);
-    this.buffer.remove_all_tags (start_iter, end_iter);
+    var tag_table = this.buffer.get_tag_table ();
+
+    /* We can't use gtk_text_buffer_remove_all_tags because that will also
+       remove the ones added by gspell */
+    for (int i = 0; i < TEXT_TAGS.length; i ++)
+      this.buffer.remove_tag (tag_table.lookup (TEXT_TAGS[i]), start_iter, end_iter);
+
     TweetUtils.annotate_text (this.buffer);
+
+    if (buffer.text.length == 0)
+      completion_window.hide ();
   }
 
   private void show_completion_window () {
-    debug ("show_completion_window");
     if (!this.get_mapped ())
       return;
 
+    debug ("show_completion_window");
     int x, y;
     Gtk.Allocation alloc;
     this.get_allocation (out alloc);
@@ -211,8 +240,13 @@ class CompletionTextView : Gtk.TextView {
     completion_window.show_all ();
   }
 
-  private bool completion_window_focus_out_cb () {
+  private void hide_completion_window () {
     completion_window.hide ();
+    this.current_word = null;
+  }
+
+  private bool completion_window_focus_out_cb () {
+    hide_completion_window ();
     return false;
   }
 
@@ -230,28 +264,35 @@ class CompletionTextView : Gtk.TextView {
                               end_char.isgraph () || end_char == '@';
     if (!cur_word.has_prefix ("@") || !word_has_alpha_end
         || this.buffer.has_selection) {
-      completion_window.hide ();
+      hide_completion_window ();
       return;
     }
-    show_completion_window ();
+
+
 
     // Strip off the @
     cur_word = cur_word.substring (1);
 
-    int corpus_size = 0;
-    var corpus = account.user_counter.query_by_prefix (cur_word, 10, out corpus_size);
+    if (cur_word != this.current_word) {
+      show_completion_window ();
+      this.current_word = cur_word;
 
-    for (int i = 0; i < corpus_size; i++) {
-      var l = new Gtk.Label ("@" + corpus[i].screen_name);
-      l.halign = Gtk.Align.START;
-      completion_list.add (l);
-    }
-    if (corpus_size > 0) {
-      completion_list.select_row (completion_list.get_row_at_index (0));
-      current_match = 0;
-    }
-    completion_list.show_all ();
+      Cb.UserInfo[] corpus;
+      account.user_counter.query_by_prefix (account.db.get_sqlite_db (),
+                                            cur_word, 10,
+                                            out corpus);
 
+      for (int i = 0; i < corpus.length; i++) {
+        var l = new Gtk.Label ("@" + corpus[i].screen_name);
+        l.halign = Gtk.Align.START;
+        completion_list.add (l);
+      }
+      if (corpus.length > 0) {
+        completion_list.select_row (completion_list.get_row_at_index (0));
+        current_match = 0;
+      }
+      completion_list.show_all ();
+    }
   }
 
   private string get_cursor_word (out Gtk.TextIter start_iter,

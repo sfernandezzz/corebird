@@ -15,11 +15,9 @@
  *  along with corebird.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-
 public class BundleHistory {
   private int[] elements;
-  private Bundle[] bundles;
+  private Cb.Bundle[] bundles;
   private int pos = -1;
 
   public int current {
@@ -31,7 +29,7 @@ public class BundleHistory {
     }
   }
 
-  public Bundle? current_bundle {
+  public Cb.Bundle? current_bundle {
     get {
       if (pos == -1)
         return null;
@@ -46,10 +44,10 @@ public class BundleHistory {
     for (int i = 0; i < size; i++)
       elements[i] = -1;
 
-    bundles = new Bundle[size];
+    bundles = new Cb.Bundle[size];
   }
 
-  public void push (int v, Bundle? b) {
+  public void push (int v, Cb.Bundle? b) {
     if (pos < elements.length - 1) {
       pos ++;
       elements[pos] = v;
@@ -85,16 +83,32 @@ public class BundleHistory {
   }
 
   public bool at_end () {
-    if (pos == elements.length -1)
+    if (pos == elements.length - 1)
       return true;
 
-    if (elements[pos] == -1 ||
+    if (pos == -1 ||
+        elements[pos] == -1 ||
         elements[pos + 1] == -1)
       return true;
 
     return false;
   }
 
+  /* Calling this alone won't go one step back! */
+  public void remove_current () {
+    elements[pos] = -1;
+    bundles[pos]  = null;
+    /* Now fill an eventual gap by moving everything one positino back */
+    if (pos + 1 < elements.length - 1 &&
+        elements[pos + 1] != -1) {
+      for (int i = pos + 1; i < elements.length; i ++) {
+        elements[i - 1] = elements[i];
+        bundles[i - 1]  = bundles[i];
+      }
+    }
+  }
+
+/*
   public string to_string () {
     string a = "[";
     for (int i = 0; i < elements.length; i++) {
@@ -107,4 +121,5 @@ public class BundleHistory {
     a += "]";
     return a;
   }
+*/
 }

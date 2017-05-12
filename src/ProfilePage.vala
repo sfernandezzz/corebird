@@ -22,6 +22,9 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     {"tweet-to", tweet_to_activated},
     {"add-remove-list", add_remove_list_activated},
   };
+  public const int KEY_SCREEN_NAME = 0;
+  public const int KEY_USER_ID     = 1;
+
 
   public int unread_count {
     get { return 0; }
@@ -96,24 +99,12 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
   private Cursor? following_cursor = null;
   private GLib.SimpleActionGroup actions;
 
-  public ProfilePage (int id, Account account, DeltaUpdater delta_updater) {
+  public ProfilePage (int id, Account account) {
     this.id = id;
     this.account = account;
     this.user_lists.account = account;
     this.tweet_list.account = account;
-    this.tweet_list.delta_updater = delta_updater;
 
-    this.scroll_event.connect ((evt) => {
-      if (evt.delta_y < 0 && this.vadjustment.value == 0) {
-        if (banner_image.scale >= 1.0) {
-          banner_image.scale = 1.0f;
-          return Gdk.EVENT_PROPAGATE;
-        }
-        banner_image.scale += 0.25f * (-evt.delta_y);
-        return Gdk.EVENT_STOP;
-      }
-      return Gdk.EVENT_PROPAGATE;
-    });
     this.scrolled_to_end.connect (() => {
       if (user_stack.visible_child == tweet_list) {
         this.load_older_tweets.begin ();
@@ -125,21 +116,21 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     });
 
     tweet_list.row_activated.connect ((row) => {
-      var bundle = new Bundle ();
-      bundle.put_int ("mode", TweetInfoPage.BY_INSTANCE);
-      bundle.put_object ("tweet", ((TweetListEntry)row).tweet);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int (TweetInfoPage.KEY_MODE, TweetInfoPage.BY_INSTANCE);
+      bundle.put_object (TweetInfoPage.KEY_TWEET, ((TweetListEntry)row).tweet);
       main_window.main_widget.switch_page (Page.TWEET_INFO, bundle);
     });
     followers_list.row_activated.connect ((row) => {
-      var bundle = new Bundle ();
-      bundle.put_int64 ("user_id", ((UserListEntry)row).user_id);
-      bundle.put_string ("screen_name", ((UserListEntry)row).screen_name);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (ProfilePage.KEY_USER_ID, ((UserListEntry)row).user_id);
+      bundle.put_string (ProfilePage.KEY_SCREEN_NAME, ((UserListEntry)row).screen_name);
       main_window.main_widget.switch_page (Page.PROFILE, bundle);
     });
     following_list.row_activated.connect ((row) => {
-      var bundle = new Bundle ();
-      bundle.put_int64 ("user_id", ((UserListEntry)row).user_id);
-      bundle.put_string ("screen_name", ((UserListEntry)row).screen_name);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (ProfilePage.KEY_USER_ID, ((UserListEntry)row).user_id);
+      bundle.put_string (ProfilePage.KEY_SCREEN_NAME, ((UserListEntry)row).screen_name);
       main_window.main_widget.switch_page (Page.PROFILE, bundle);
     });
 
@@ -172,6 +163,10 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     this.user_id = user_id;
     follow_button.sensitive = (user_id != account.id);
 
+
+    loading_stack.visible_child_name = "progress";
+    progress_spinner.start ();
+
     set_banner (null);
     load_friendship.begin ();
     load_profile_data.begin (user_id);
@@ -203,9 +198,6 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
   }
 
   private async void load_profile_data (int64 user_id) {
-    loading_stack.visible_child_name = "progress";
-    progress_spinner.start ();
-
     follow_button.sensitive = false;
     var call = account.proxy.new_call ();
     call.set_method ("GET");
@@ -229,18 +221,21 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     string avatar_url = root.get_string_member("profile_image_url");
     int scale = this.get_scale_factor ();
 
-    if (scale == 1)
-      avatar_url = avatar_url.replace("_normal", "_bigger");
-    else
-      avatar_url = avatar_url.replace ("_normal", "_200x200");
+    /* Always load the 200x200 px version even in loDPI since there's no 100x100px version */
+    avatar_url = avatar_url.replace ("_normal", "_200x200");
 
-    // We don't use our AvatarCache here because this (73×73) avatar is only
+    // We don't use our AvatarCache here because this (100×100) avatar is only
     // ever loaded here.
-    TweetUtils.download_avatar.begin (avatar_url, 73 * scale, (obj, res) => {
+    TweetUtils.download_avatar.begin (avatar_url, 100 * scale, (obj, res) => {
       Cairo.Surface surface;
       try {
         var pixbuf = TweetUtils.download_avatar.end (res);
-        surface = Gdk.cairo_surface_create_from_pixbuf (pixbuf, scale, null);
+        if (pixbuf == null) {
+          surface = scale_surface ((Cairo.ImageSurface)Twitter.no_avatar,
+                                   100, 100);
+        } else {
+          surface = Gdk.cairo_surface_create_from_pixbuf (pixbuf, scale, null);
+        }
       } catch (GLib.Error e) {
         warning (e.message);
         surface = Twitter.no_avatar;
@@ -266,9 +261,12 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
       tweet_list.set_placeholder_text (_("Protected profile"));
     }
 
+    string color = root.get_string_member ("profile_background_color");
+    banner_image.color_string = "#" + color;
+
     if (root.has_member ("profile_banner_url")) {
       string banner_base_url = root.get_string_member ("profile_banner_url");
-      load_profile_banner (banner_base_url, user_id);
+      load_profile_banner (banner_base_url);
     }
 
     string display_url = "";
@@ -318,7 +316,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
 
 
     var section = (GLib.Menu)more_button.menu_model.get_item_link (0, GLib.Menu.LINK_SECTION);
-    var user_item = new GLib.MenuItem (_("Tweet to @%s").printf (screen_name),
+    var user_item = new GLib.MenuItem (_("Tweet to @%s").printf (screen_name.replace ("_", "__")),
                                        "user.tweet-to");
     section.remove (1);
     section.insert_item (1, user_item);
@@ -376,6 +374,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     call.add_param ("user_id", this.user_id.to_string ());
     call.add_param ("count", requested_tweet_count.to_string ());
     call.add_param ("contributor_details", "true");
+    call.add_param ("tweet_mode", "extended");
     call.add_param ("include_my_retweet", "true");
 
 
@@ -395,9 +394,9 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
       tweet_list.set_empty ();
       return;
     }
-    yield TweetUtils.work_array (root_array,
-                                 tweet_list,
-                                 account);
+    TweetUtils.work_array (root_array,
+                           tweet_list,
+                           account);
     tweets_loading = false;
   }
 
@@ -417,7 +416,8 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     call.add_param ("count", requested_tweet_count.to_string ());
     call.add_param ("contributor_details", "true");
     call.add_param ("include_my_retweet", "true");
-    call.add_param ("max_id", (tweet_list.model.lowest_id - 1).to_string ());
+    call.add_param ("tweet_mode", "extended");
+    call.add_param ("max_id", (tweet_list.model.min_id - 1).to_string ());
 
     Json.Node? root = null;
     try {
@@ -430,9 +430,9 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     if (root == null) return;
 
     var root_arr = root.get_array ();
-    yield TweetUtils.work_array (root_arr,
-                                 tweet_list,
-                                 account);
+    TweetUtils.work_array (root_arr,
+                           tweet_list,
+                           account);
     tweets_loading = false;
   }
 
@@ -465,7 +465,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
       var entry = new UserListEntry ();
       entry.show_settings = false;
       entry.user_id = user_obj.get_int_member ("id");
-      entry.screen_name = "@" + user_obj.get_string_member ("screen_name");
+      entry.set_screen_name ("@" + user_obj.get_string_member ("screen_name"));
       entry.name = user_obj.get_string_member ("name");
       entry.avatar_url = avatar_url;
       entry.get_style_context ().add_class ("tweet");
@@ -504,7 +504,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
       var entry = new UserListEntry ();
       entry.show_settings = false;
       entry.user_id = user_obj.get_int_member ("id");
-      entry.screen_name = "@" + user_obj.get_string_member ("screen_name");
+      entry.set_screen_name ("@" + user_obj.get_string_member ("screen_name"));
       entry.name = user_obj.get_string_member ("name");
       entry.avatar_url = avatar_url;
       entry.get_style_context ().add_class ("tweet");
@@ -516,7 +516,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
     this.following_loading = false;
   }
 
-  private void load_profile_banner (string base_url, int64 user_id) {
+  private void load_profile_banner (string base_url) {
     string banner_url  = base_url + "/mobile_retina";
     Utils.download_pixbuf.begin (banner_url, null, (obj, res) => {
       Gdk.Pixbuf? banner = Utils.download_pixbuf.end (res);
@@ -581,12 +581,12 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
   /**
    * see IPage#onJoin
    */
-  public void on_join (int page_id, Bundle? args) {
-    int64 user_id = args.get_int64 ("user_id");
+  public void on_join (int page_id, Cb.Bundle? args) {
+    int64 user_id = args.get_int64 (KEY_USER_ID);
     if (user_id == -1)
       return;
 
-    string? screen_name = args.get_string ("screen_name");
+    string? screen_name = args.get_string (KEY_SCREEN_NAME);
     if (screen_name != null) {
       this.screen_name = screen_name;
     }
@@ -623,7 +623,7 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
   public void on_leave () {
     // We might otherwise overwrite the new user's data with that from the old one.
     data_cancellable.cancel ();
-    banner_image.scale = 0.3;
+    more_button.get_popover ().hide ();
   }
 
   private void reset_data () {
@@ -650,11 +650,11 @@ class ProfilePage : ScrollWidget, IPage, IMessageReceiver {
   }
 
   private void write_dm_activated (GLib.SimpleAction a, GLib.Variant? v) {
-    var bundle = new Bundle ();
-    bundle.put_int64 ("sender_id", user_id);
-    bundle.put_string ("screen_name", screen_name);
-    bundle.put_string ("name", name);
-    bundle.put_string ("avatar_url", avatar_url.replace ("_bigger", "_normal"));
+    var bundle = new Cb.Bundle ();
+    bundle.put_int64 (DMPage.KEY_SENDER_ID, user_id);
+    bundle.put_string (DMPage.KEY_SCREEN_NAME, screen_name);
+    bundle.put_string (DMPage.KEY_USER_NAME, name);
+    bundle.put_string (DMPage.KEY_AVATAR_URL, avatar_url.replace ("_bigger", "_normal"));
     main_window.main_widget.switch_page (Page.DM, bundle);
   }
 

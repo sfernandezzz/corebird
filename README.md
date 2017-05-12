@@ -1,8 +1,7 @@
-# Corebird
+# Corebird 1.5
 
-This is the readme for the current *development version*. If you're looking for one of the stable releases, check the "releases" link at the top of this page.
 
-[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=baedert&url=http://github.com/baedert/corebird&title=corebird&language=vala&tags=github&category=software)
+[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=baedert&url=http://github.com/baedert/corebird&title=corebird&language=vala&tags=github&category=software) [![Supprt Corebird on Patreon](https://baedert.org/patreon-donate-yellow.svg)](https://patreon.com/baedert)
 
 ## Shortcuts
 
@@ -12,7 +11,7 @@ This is the readme for the current *development version*. If you're looking for 
 | `Back`             | Go one page back (this can be triggered via the back button on the keyboard, the back thumb button on the mouse or  `Alt + Left`)           |
 | `Forward`          | Go one page forward (this can be triggered via the forward button on the keyboard, the forward thumb button on the mouse or  `Alt + Right`) |
 | `Alt + num`        | Go to page `num` (between 1 and 7 at the moment)                                                                                            |
-| `Ctrl + Shift + s` | Show/Hide sidebar                                                                                                                           |
+| `Ctrl + Shift + s` | Show/Hide topbar                                                                                                                            |
 | `Ctrl + p`         | Show account settings                                                                                                                       |
 | `Ctrl + k`         | Show account list                                                                                                                           |
 | `Ctrl + Shift + p` | Show application settings                                                                                                                   |
@@ -23,6 +22,7 @@ This is the readme for the current *development version*. If you're looking for 
   - `r`  - reply
   - `tt` - retweet
   - `f`  - favorite
+  - `q`  - quote
   - `dd` - delete
   - `Return` - Show tweet details
 
@@ -32,7 +32,7 @@ This is the readme for the current *development version*. If you're looking for 
 
 ## Contributing
 
-  All contributions are welcome (artword, design, code, just ideas, etc.) but if you're planning to
+  All contributions are welcome (artwork, design, code, just ideas, etc.) but if you're planning to
   actively change something bigger, talk to me first.
 
 
@@ -50,6 +50,7 @@ This is the readme for the current *development version*. If you're looking for 
  - `gst-plugins-bad-1.0 >= 1.6` (disable via --disable-video, default enabled)
  - `gst-plugins-good-1.0` (disable via --disable-video, default enabled)
  - `gst-libav-1.0` (disable via --disable-video, default enabled)
+ - `gspell-1 >= 1.0` (for spellchecking, disable via --disable-spellcheck, default enabled)
 
 Note that the above packages are just rough estimations, the actual package names on your distribution may vary.
 

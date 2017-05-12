@@ -1,5 +1,11 @@
 @define-color topbar_bg #333;
 
+* {
+  /* The default for this style property for gtk3 is 150
+   * so we have to get rid of that. */
+  -GtkProgressBar-min-horizontal-bar-width: 0;
+}
+
 .avatar-round {
   border: 1px solid grey;
   border-radius: 48px;
@@ -60,15 +66,15 @@
   opacity: 0.9;
   box-shadow: none;
   border: none;
-  border-top: 2px solid transparent;
   border-bottom: 2px solid transparent;
+  border-top: 2px solid transparent;
 }
 
 .inline-media:hover {
-  border-top: 2px solid #4a90d9;
-  border-bottom: 2px solid #4a90d9;
   opacity: 1.0;
   box-shadow: none;
+  border-top: 2px solid grey;
+  border-bottom: 2px solid grey;
 }
 
 .image-progress {
@@ -107,25 +113,19 @@
 }
 
 
-.retweet-button,
-.favorite-button,
-.reply-button,
-.more-button{
-  background-color: transparent;
-}
 .retweet-button:hover,
 .retweet-button:checked {
-  color:green;
+  color: shade(green, 1.1);
 }
 
 .favorite-button:hover,
 .favorite-button:checked {
-  color: shade(red, 0.9);
+  color: red;
 }
 
 /* Don't target :hover:active here */
-.favorite-button:checked,
-.retweet-button:checked {
+.favorite-button:checked:not(:hover),
+.retweet-button:checked:not(:hover) {
   background-image: none;
   background-color: transparent;
   border-color: transparent;
@@ -156,6 +156,7 @@
   border-radius: 0px;
   border-bottom: 1px solid transparent;
   min-height: 0px;
+  margin-bottom: -1px;
 }
 
 .text-only-button:hover {
@@ -234,6 +235,45 @@
   box-shadow: none;
 }
 
-.avatar:insensitive {
+.avatar:insensitive,
+.inline-media:insensitive {
   opacity: 0.4;
+}
+/* Override the earlier rule to read-only
+ * inline media are still full-opacity */
+.read-only .inline-media:insensitive {
+  opacity: 1.0;
+}
+
+progressbar.horizontal.embedded-progress,
+progressbar.horizontal.embedded-progress>trough,
+progressbar.horizontal.embedded-progress>trough>progress {
+  margin: 0px;
+  border-radius: 0px;
+  border-left-width: 0px;
+  border-right-width: 0px;
+}
+
+.fav-image-box {
+  padding: 6px;
+}
+
+/* GtkFlowBox doesn't handle the hover state of its children so... */
+.fav-image-item:hover {
+  background-color: alpha(black, 0.1);
+}
+
+.fav-image-item:active {
+  background-color: alpha(black, 0.3);
+}
+
+.nobg {
+  /* Hide background for really fucked up themes */
+  background: none;
+  box-shadow: none;
+  border: none;
+}
+
+.invisible-links link:link {
+  color:inherit;
 }

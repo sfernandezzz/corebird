@@ -6,10 +6,14 @@
         <attribute name="label" translatable="yes">Quote</attribute>
         <attribute name="action">tweet.quote</attribute>
       </item>
+      <item>
+        <attribute name="label" translatable="yes">Delete</attribute>
+        <attribute name="action">tweet.delete</attribute>
+      </item>
     </section>
   </menu>
   <template class="TweetInfoPage" parent="ScrollWidget">
-    <property name="can-focus">True</property>
+    <property name="can-focus">1</property>
     <property name="hscrollbar-policy">never</property>
     <child>
       <object class="GtkStack" id="main_stack">
@@ -58,7 +62,6 @@
                     <property name="can-focus">False</property>
                     <property name="margin-start">12</property>
                     <property name="margin-top">6</property>
-                    <property name="margin-bottom">6</property>
                     <property name="margin-end">6</property>
                     <property name="halign">start</property>
                     <property name="valign">center</property>
@@ -105,13 +108,52 @@
               </packing>
             </child>
             <child>
+              <object class="GtkBox" id="reply_box">
+                <property name="visible">1</property>
+                <property name="margin-start">8</property>
+                <property name="margin-end">6</property>
+                <property name="margin-bottom">6</property>
+                <property name="margin-top">6</property>
+                <style>
+                  <class name="dim-label" />
+                </style>
+                <child>
+                  <object class="GtkImage">
+                    <property name="visible">1</property>
+                    <property name="icon-name">corebird-conversation-symbolic</property>
+                    <property name="icon-size">1</property>
+                    <property name="valign">start</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="reply_label">
+                    <property name="visible">1</property>
+                    <property name="halign">start</property>
+                    <property name="valign">center</property>
+                    <property name="xalign">0</property>
+                    <property name="wrap">1</property>
+                    <property name="margin-start">6</property>
+                    <property name="use-markup">1</property>
+                    <signal name="activate-link" handler="link_activated_cb" />
+                    <style>
+                      <class name="invisible-links" />
+                    </style>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">4</property>
+                <property name="width">8</property>
+              </packing>
+            </child>
+            <child>
               <object class="GtkLabel" id="text_label">
                 <property name="visible">1</property>
                 <property name="can-focus">1</property>
                 <property name="margin-start">8</property>
                 <property name="margin-end">6</property>
-                <property name="margin-top">2</property>
-                <property name="margin-bottom">3</property>
+                <property name="margin-bottom">12</property>
                 <property name="hexpand">1</property>
                 <property name="xalign">0</property>
                 <property name="yalign">0</property>
@@ -127,7 +169,7 @@
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">4</property>
+                <property name="top-attach">5</property>
                 <property name="width">8</property>
               </packing>
             </child>
@@ -135,12 +177,12 @@
               <object class="MultiMediaWidget" id="mm_widget">
                 <property name="visible">true</property>
                 <property name="margin-bottom">12</property>
-                <property name="margin-start">10</property>
-                <property name="margin-end">10</property>
+                <property name="margin-start">8</property>
+                <property name="margin-end">8</property>
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">5</property>
+                <property name="top-attach">6</property>
                 <property name="width">8</property>
               </packing>
             </child>
@@ -159,7 +201,7 @@
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">6</property>
+                <property name="top-attach">7</property>
                 <property name="width">6</property>
               </packing>
             </child>
@@ -176,7 +218,7 @@
               </object>
               <packing>
                 <property name="left-attach">6</property>
-                <property name="top-attach">6</property>
+                <property name="top-attach">7</property>
                 <property name="width">2</property>
               </packing>
             </child>
@@ -194,7 +236,7 @@
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
                 <property name="width">3</property>
               </packing>
             </child>
@@ -211,7 +253,7 @@
               </object>
               <packing>
                 <property name="left-attach">3</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
               </packing>
             </child>
             <child>
@@ -238,7 +280,7 @@
               </object>
               <packing>
                 <property name="left-attach">4</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
               </packing>
             </child>
             <child>
@@ -253,7 +295,7 @@
                 <child>
                   <object class="GtkImage">
                     <property name="visible">1</property>
-                    <property name="icon-name">emblem-favorite-symbolic</property>
+                    <property name="icon-name">corebird-favorite-symbolic</property>
                     <property name="icon-size">1</property>
                   </object>
                 </child>
@@ -265,7 +307,7 @@
               </object>
               <packing>
                 <property name="left-attach">5</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
               </packing>
             </child>
             <child>
@@ -292,7 +334,7 @@
               </object>
               <packing>
                 <property name="left-attach">6</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
               </packing>
             </child>
             <child>
@@ -322,7 +364,7 @@
               </object>
               <packing>
                 <property name="left-attach">7</property>
-                <property name="top-attach">7</property>
+                <property name="top-attach">8</property>
               </packing>
             </child>
             <child>
@@ -334,7 +376,7 @@
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">8</property>
+                <property name="top-attach">9</property>
                 <property name="width">8</property>
               </packing>
             </child>

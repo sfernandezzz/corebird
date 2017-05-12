@@ -15,15 +15,19 @@
  *  along with corebird.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-class AvatarWidget : Gtk.Widget {
+public class AvatarWidget : Gtk.Widget {
   private const int SMALL = 0;
   private const int LARGE = 1;
+  private const int OVERLAP_DIST = 40;
   private bool _round = true;
   public bool make_round {
     get {
       return _round;
     }
     set {
+      if (value == _round)
+        return;
+
       if (value) {
         this.get_style_context ().add_class ("avatar-round");
       } else {
@@ -35,6 +39,8 @@ class AvatarWidget : Gtk.Widget {
     }
   }
   public bool verified { get; set; default = false; }
+  public bool overlap  { get; set; default = false; }
+  public int size      { get; set; default = 48;    }
 
   private Cairo.ImageSurface _surface;
   public Cairo.Surface surface {
@@ -67,7 +73,7 @@ class AvatarWidget : Gtk.Widget {
 
 
   static Cairo.Surface[] verified_icons;
-  const int[] VERIFIED_SIZES = {12, 18};
+  const int[] VERIFIED_SIZES = {12, 25};
   static construct {
     try {
       verified_icons = {
@@ -94,6 +100,7 @@ class AvatarWidget : Gtk.Widget {
     Settings.get ().bind ("round-avatars", this, "make_round",
                           GLib.SettingsBindFlags.DEFAULT);
     this.get_style_context ().add_class ("avatar");
+    this.get_style_context ().add_class ("avatar-round"); // default is TRUE
   }
 
   ~AvatarWidget () {
@@ -128,8 +135,8 @@ class AvatarWidget : Gtk.Widget {
 
 
   public override bool draw (Cairo.Context ctx) {
-    int width  = this.get_allocated_width ();
-    int height = this.get_allocated_height ();
+    int width  = this.size;
+    int height = this.size;
 
     if (this._surface == null) {
       return Gdk.EVENT_PROPAGATE;
@@ -155,6 +162,12 @@ class AvatarWidget : Gtk.Widget {
     ct.set_source_surface (this._surface, 0, 0);
     ct.fill();
 
+    int y;
+    if (overlap)
+      y = - OVERLAP_DIST;
+    else
+      y = 0;
+
     if (_round) {
       ct.scale (1.0/scale, 1.0/scale);
       ct.set_operator (Cairo.Operator.DEST_IN);
@@ -164,10 +177,11 @@ class AvatarWidget : Gtk.Widget {
               2 * Math.PI);        // Angle to
       ct.fill ();
 
-      this.get_style_context ().render_frame (ctx, 0, 0, width, height);
+      this.get_style_context ().render_frame (ctx, 0, y, width, height);
     }
 
-    ctx.set_source_surface (surface, 0, 0);
+
+    ctx.set_source_surface (surface, 0, y);
     ctx.paint_with_alpha (alpha);
 
     if (verified) {
@@ -179,13 +193,37 @@ class AvatarWidget : Gtk.Widget {
       Cairo.Surface verified_img = verified_icons[scale_factor * 2 + index];
       ctx.set_source_surface (verified_img,
                               width - VERIFIED_SIZES[index],
-                              0);
+                              y);
       ctx.paint_with_alpha (this.alpha);
     }
 
     return Gdk.EVENT_PROPAGATE;
   }
 
+  public override void size_allocate (Gtk.Allocation alloc) {
+    base.size_allocate (alloc);
+
+    if (overlap) {
+      alloc.y -= OVERLAP_DIST;
+      alloc.height += OVERLAP_DIST;
+      this.set_clip (alloc);
+    }
+  }
+
+  public override void get_preferred_width (out int min, out int nat) {
+    min = size;
+    nat = size;
+  }
+
+  public override void get_preferred_height (out int min, out int nat) {
+    if (overlap) {
+      min = size - OVERLAP_DIST;
+      nat = size - OVERLAP_DIST;
+    } else {
+      min = size;
+      nat = size;
+    }
+  }
 }
 
 

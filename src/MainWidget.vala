@@ -19,12 +19,11 @@
 public class MainWidget : Gtk.Box {
   private unowned Account account;
 
-  private Gtk.RadioButton dummy_button = new Gtk.RadioButton (null);
+  private Gtk.RadioButton dummy_button  = new Gtk.RadioButton (null);
   private IPage[] pages;
-  private BundleHistory history        = new BundleHistory (5);
-  private DeltaUpdater delta_updater   = new DeltaUpdater ();
-  private bool page_switch_lock        = false;
-  private ImpostorWidget stack_impostor = new ImpostorWidget ();
+  private BundleHistory history         = new BundleHistory (10);
+  private bool page_switch_lock         = false;
+  private ImpostorWidget stack_impostor  = new ImpostorWidget ();
 
 
   [GtkChild]
@@ -51,14 +50,14 @@ public class MainWidget : Gtk.Box {
     pages[0]  = new HomeTimeline (Page.STREAM, account);
     pages[1]  = new MentionsTimeline (Page.MENTIONS, account);
     pages[2]  = new FavoritesTimeline (Page.FAVORITES, account);
-    pages[3]  = new DMThreadsPage (Page.DM_THREADS, account, delta_updater);
+    pages[3]  = new DMThreadsPage (Page.DM_THREADS, account);
     pages[4]  = new ListsPage (Page.LISTS, account);
     pages[5]  = new FilterPage (Page.FILTERS, account);
-    pages[6]  = new SearchPage (Page.SEARCH, account, delta_updater);
-    pages[7]  = new ProfilePage (Page.PROFILE, account, delta_updater);
-    pages[8]  = new TweetInfoPage (Page.TWEET_INFO, account, delta_updater);
-    pages[9]  = new DMPage (Page.DM, account, delta_updater);
-    pages[10] = new ListStatusesPage (Page.LIST_STATUSES, account, delta_updater);
+    pages[6]  = new SearchPage (Page.SEARCH, account);
+    pages[7]  = new ProfilePage (Page.PROFILE, account);
+    pages[8]  = new TweetInfoPage (Page.TWEET_INFO, account);
+    pages[9]  = new DMPage (Page.DM, account);
+    pages[10] = new ListStatusesPage (Page.LIST_STATUSES, account);
 
     /* Initialize all containers */
     for (int i = 0; i < pages.length; i++) {
@@ -78,13 +77,6 @@ public class MainWidget : Gtk.Box {
           }
         });
       }
-
-
-      if (!(page is DefaultTimeline))
-        continue;
-
-      DefaultTimeline tl = (DefaultTimeline)page;
-      tl.delta_updater = delta_updater;
     }
 
     Settings.get ().bind ("sidebar-visible", sidebar_revealer, "reveal-child",
@@ -99,7 +91,7 @@ public class MainWidget : Gtk.Box {
    *                See the Page.* constants.
    *
    */
-  public void switch_page (int page_id, Bundle? args = null) {
+  public void switch_page (int page_id, Cb.Bundle? args = null) {
     if (page_id == history.current) {
       if (pages[page_id].handles_double_open ())
         pages[page_id].double_open ();
@@ -174,6 +166,11 @@ public class MainWidget : Gtk.Box {
     page_switch_lock = false;
 
     ((MainWindow)this.parent).back_button.sensitive = !history.at_start ();
+  }
+
+  public void remove_current_page () {
+    this.history.remove_current ();
+    this.switch_page (Page.PREVIOUS);
   }
 
   public IPage get_page (int page_id) {

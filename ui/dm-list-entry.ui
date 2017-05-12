@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <template class="DMListEntry" parent="GtkListBoxRow">
-    <property name="visible">True</property>
-    <property name="can-focus">True</property>
-    <property name="activatable">false</property>
+    <property name="visible">1</property>
+    <property name="can-focus">1</property>
+    <property name="activatable">0</property>
     <style>
       <class name="tweet"/>
     </style>
@@ -85,6 +85,7 @@
             <property name="wrap-mode">word-char</property>
             <property name="use-markup">1</property>
             <property name="track-visited-links">0</property>
+            <property name="selectable">1</property>
           </object>
           <packing>
             <property name="left-attach">1</property>

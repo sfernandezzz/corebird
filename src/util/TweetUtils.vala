@@ -22,6 +22,7 @@ namespace TweetUtils {
      ".asia", ".cat",  ".coop",   ".edu",  ".int",  ".jobs",
      ".mil",  ".mobi", ".museum", ".post", ".tel",  ".travel"
   };
+  public const string NO_SPELL_CHECK = "gtksourceview:context-classes:no-spell-check";
 
   /**
    * Deletes the given tweet.
@@ -157,7 +158,6 @@ namespace TweetUtils {
 
   /**
    * Calculates the length of a tweet.
-   * See https://dev.twitter.com/docs/faq#5810 for details
    *
    * @param text The text to calculate the length for
    *
@@ -166,7 +166,6 @@ namespace TweetUtils {
    */
   public int calc_tweet_length (string text, int media_count = 0) {
     int length = 0;
-
     unichar c;
     int last_word_start = 0;
     int n_chars = text.char_count ();
@@ -198,22 +197,14 @@ namespace TweetUtils {
       cur = next;
     }
 
-    if (length < 0) {
-      return Twitter.characters_reserved_per_media * media_count;
-    }
-
-    length += Twitter.characters_reserved_per_media * media_count;
-
     return length;
   }
 
   private int get_word_length (string s) {
-    if (s.has_prefix ("www.") || s.has_prefix ("http://"))
+    if (s.has_prefix ("www.")    ||
+        s.has_prefix ("http://") ||
+        s.has_prefix ("https://"))
       return Twitter.short_url_length;
-
-    if (s.has_prefix ("https://"))
-      return Twitter.short_url_length_https;
-
 
     string[] parts = s.split ("/");
     if (parts.length > 0) {
@@ -227,24 +218,26 @@ namespace TweetUtils {
   }
 
   bool activate_link (string uri, MainWindow window) {
+    debug ("Activating '%s'", uri);
     uri = uri._strip ();
     string term = uri.substring (1);
 
     if (uri.has_prefix ("@")) {
       int slash_index = uri.index_of ("/");
-      var bundle = new Bundle ();
+      var bundle = new Cb.Bundle ();
       if (slash_index == -1) {
-        bundle.put_int64 ("user_id", int64.parse (term));
+        bundle.put_int64 (ProfilePage.KEY_USER_ID, int64.parse (term));
         window.main_widget.switch_page (Page.PROFILE, bundle);
       } else {
-        bundle.put_int64 ("user_id", int64.parse (term.substring (0, slash_index - 1)));
-        bundle.put_string ("screen_name", term.substring (slash_index + 1, term.length - slash_index - 1));
+        bundle.put_int64 (ProfilePage.KEY_USER_ID, int64.parse (term.substring (0, slash_index - 1)));
+        bundle.put_string (ProfilePage.KEY_SCREEN_NAME,
+                           term.substring (slash_index + 1, term.length - slash_index - 1));
         window.main_widget.switch_page (Page.PROFILE, bundle);
       }
       return true;
     } else if (uri.has_prefix ("#")) {
-      var bundle = new Bundle ();
-      bundle.put_string ("query", uri);
+      var bundle = new Cb.Bundle ();
+      bundle.put_string (SearchPage.KEY_QUERY, uri);
       window.main_widget.switch_page (Page.SEARCH, bundle);
       return true;
     } else if (uri.has_prefix ("https://twitter.com/")) {
@@ -253,10 +246,10 @@ namespace TweetUtils {
       if (parts[4] == "status") {
         /* Treat it as a tweet link and hope it'll work out */
         int64 tweet_id = int64.parse (parts[5]);
-        var bundle = new Bundle ();
-        bundle.put_int ("mode", TweetInfoPage.BY_ID);
-        bundle.put_int64 ("tweet_id", tweet_id);
-        bundle.put_string ("screen_name", parts[3]);
+        var bundle = new Cb.Bundle ();
+        bundle.put_int (TweetInfoPage.KEY_MODE, TweetInfoPage.BY_ID);
+        bundle.put_int64 (TweetInfoPage.KEY_TWEET_ID, tweet_id);
+        bundle.put_string (TweetInfoPage.KEY_SCREEN_NAME, parts[3]);
         window.main_widget.switch_page (Page.TWEET_INFO,
                                         bundle);
         return true;
@@ -266,50 +259,34 @@ namespace TweetUtils {
   }
 
 
-  async void work_array (Json.Array   json_array,
-                         TweetListBox tweet_list,
-                         Account      account) {
-    new Thread<void*> ("TweetWorker", () => {
-      uint n_tweets = json_array.get_length ();
-      uint index    = 0;
-      /* If the request returned no results at all, we don't
-         need to do all the later stuff */
-      if (n_tweets == 0) {
-        GLib.Idle.add (() => {
-          work_array.callback ();
-          return GLib.Source.REMOVE;
-        });
-        return null;
-      }
+  void work_array (Json.Array   json_array,
+                   TweetListBox tweet_list,
+                   Account      account) {
+    uint n_tweets = json_array.get_length ();
+    /* If the request returned no results at all, we don't
+       need to do all the later stuff */
+    if (n_tweets == 0) {
+      return;
+    }
 
-      var now = new GLib.DateTime.now_local ();
-      GLib.Idle.add (() => {
-        var tweet = new Cb.Tweet ();
-        tweet.load_from_json (json_array.get_element (index), account.id, now);
-        if (account.user_counter == null ||
-            tweet_list == null ||
-            !(tweet_list.get_toplevel () is Gtk.Window))
-          return GLib.Source.REMOVE;
+    var now = new GLib.DateTime.now_local ();
+    for (uint i = 0; i < n_tweets; i++) {
+      var tweet = new Cb.Tweet ();
+      tweet.load_from_json (json_array.get_element (i), account.id, now);
+      if (account.user_counter == null ||
+          tweet_list == null ||
+          !(tweet_list.get_toplevel () is Gtk.Window))
+        break;
 
-        account.user_counter.id_seen (ref tweet.source_tweet.author);
-        if (tweet.retweeted_tweet != null)
-          account.user_counter.id_seen (ref tweet.retweeted_tweet.author);
+      account.user_counter.id_seen (ref tweet.source_tweet.author);
+      if (tweet.retweeted_tweet != null)
+        account.user_counter.id_seen (ref tweet.retweeted_tweet.author);
 
-        if (account.filter_matches (tweet))
-          tweet.set_flag (Cb.TweetState.HIDDEN_FILTERED);
+      if (account.filter_matches (tweet))
+        tweet.set_flag (Cb.TweetState.HIDDEN_FILTERED);
 
-        tweet_list.model.add (tweet);
-
-        index ++;
-        if (index == n_tweets) {
-          work_array.callback ();
-          return GLib.Source.REMOVE;
-        }
-        return GLib.Source.CONTINUE;
-      });
-      return null;
-    });
-    yield;
+      tweet_list.model.add (tweet);
+    }
   }
 
 
@@ -319,8 +296,6 @@ namespace TweetUtils {
     media_dialog.set_modal (true);
     media_dialog.show ();
   }
-
-
 
   public bool is_link (string word) {
     if (word.has_prefix ("http://") && word.length > 7)
@@ -378,6 +353,7 @@ namespace TweetUtils {
 
     }
     buffer.apply_tag_by_name ("link", word_start, iter1);
+    buffer.apply_tag_by_name (NO_SPELL_CHECK, word_start, iter1);
   }
 
   /** Invariant: The word passed to this function starts with a @ */
@@ -401,6 +377,7 @@ namespace TweetUtils {
 
     }
     buffer.apply_tag_by_name ("mention", word_start, iter1);
+    buffer.apply_tag_by_name (NO_SPELL_CHECK, word_start, iter1);
   }
 
 
@@ -424,6 +401,7 @@ namespace TweetUtils {
 
     }
     buffer.apply_tag_by_name ("hashtag", word_start, iter1);
+    buffer.apply_tag_by_name (NO_SPELL_CHECK, word_start, iter1);
   }
 
   private void maybe_highlight_snippet (Gtk.TextBuffer buffer,
@@ -437,6 +415,7 @@ namespace TweetUtils {
     string? snippet;
     if ((snippet = Corebird.snippet_manager.get_snippet (word)) != null) {
       buffer.apply_tag_by_name ("snippet", word_start, word_end);
+      buffer.apply_tag_by_name (NO_SPELL_CHECK, word_start, word_end);
     }
   }
 

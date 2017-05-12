@@ -17,13 +17,20 @@
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/tweet-info-page.ui")]
 class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
+  public const int KEY_MODE        = 0;
+  public const int KEY_TWEET       = 1;
+  public const int KEY_EXISTING    = 2;
+  public const int KEY_TWEET_ID    = 3;
+  public const int KEY_SCREEN_NAME = 4;
+
   public const int BY_INSTANCE = 1;
   public const int BY_ID       = 2;
 
   private const GLib.ActionEntry[] action_entries = {
     {"quote",    quote_activated   },
     {"reply",    reply_activated   },
-    {"favorite", favorite_activated}
+    {"favorite", favorite_activated},
+    {"delete",   delete_activated  }
   };
 
   public int unread_count { get {return 0;} }
@@ -78,14 +85,16 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
   private Gtk.Stack main_stack;
   [GtkChild]
   private Gtk.Label error_label;
+  [GtkChild]
+  private Gtk.Label reply_label;
+  [GtkChild]
+  private Gtk.Box reply_box;
 
-  public TweetInfoPage (int id, Account account, DeltaUpdater delta_updater) {
+  public TweetInfoPage (int id, Account account) {
     this.id = id;
     this.account = account;
     this.top_list_box.account = account;
     this.bottom_list_box.account = account;
-    this.top_list_box.delta_updater = delta_updater;
-    this.bottom_list_box.delta_updater = delta_updater;
 
 
     mm_widget.media_clicked.connect ((m, i) => TweetUtils.handle_media_click (tweet, main_window, i));
@@ -98,17 +107,17 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       return false;
     });
     bottom_list_box.row_activated.connect ((row) => {
-      var bundle = new Bundle ();
-      bundle.put_int ("mode", TweetInfoPage.BY_INSTANCE);
-      bundle.put_object ("tweet", ((TweetListEntry)row).tweet);
-      bundle.put_bool ("existing", true);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int (KEY_MODE, TweetInfoPage.BY_INSTANCE);
+      bundle.put_object (KEY_TWEET, ((TweetListEntry)row).tweet);
+      bundle.put_bool (KEY_EXISTING, true);
       main_window.main_widget.switch_page (Page.TWEET_INFO, bundle);
     });
     top_list_box.row_activated.connect ((row) => {
-      var bundle = new Bundle ();
-      bundle.put_int ("mode", TweetInfoPage.BY_INSTANCE);
-      bundle.put_object ("tweet", ((TweetListEntry)row).tweet);
-      bundle.put_bool ("existing", true);
+      var bundle = new Cb.Bundle ();
+      bundle.put_int (KEY_MODE, TweetInfoPage.BY_INSTANCE);
+      bundle.put_object (KEY_TWEET, ((TweetListEntry)row).tweet);
+      bundle.put_bool (KEY_EXISTING, true);
       main_window.main_widget.switch_page (Page.TWEET_INFO, bundle);
     });
 
@@ -127,15 +136,15 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       this.mm_widget.show ();
   }
 
-  public void on_join (int page_id, Bundle? args) {
-    int mode = args.get_int ("mode");
+  public void on_join (int page_id, Cb.Bundle? args) {
+    int mode = args.get_int (KEY_MODE);
 
     if (mode == 0)
       return;
 
     values_set = false;
 
-    bool existing = args.get_bool ("existing", false);
+    bool existing = args.get_bool (KEY_EXISTING);
 
     reply_indicator.replies_available = false;
     max_size_container.max_size = 0;
@@ -144,7 +153,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
     if (existing) {
       // Only possible BY_INSTANCE
-      var tweet = (Cb.Tweet) args.get_object ("tweet");
+      var tweet = (Cb.Tweet) args.get_object (KEY_TWEET);
       rearrange_tweets (tweet.id);
     } else {
       bottom_list_box.model.clear ();
@@ -154,7 +163,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
     }
 
     if (mode == BY_INSTANCE) {
-      Cb.Tweet tweet = (Cb.Tweet)args.get_object ("tweet");
+      Cb.Tweet tweet = (Cb.Tweet)args.get_object (KEY_TWEET);
 
       if (tweet.retweeted_tweet != null)
         this.tweet_id = tweet.retweeted_tweet.id;
@@ -166,8 +175,8 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       set_tweet_data (tweet);
     } else if (mode == BY_ID) {
       this.tweet = null;
-      this.tweet_id = args.get_int64 ("tweet_id");
-      this.screen_name = args.get_string ("screen_name");
+      this.tweet_id = args.get_int64 (KEY_TWEET_ID);
+      this.screen_name = args.get_string (KEY_SCREEN_NAME);
     }
 
 
@@ -188,7 +197,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       // add the direct successor to the top_list
       top_list_box.model.clear ();
       top_list_box.show ();
-      var t = bottom_list_box.model.get_from_id (new_id, -1);
+      var t = bottom_list_box.model.get_for_id (new_id, -1);
       if (t != null) {
         top_list_box.model.add (t);
       } else {
@@ -215,11 +224,6 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
     favorite_button.sensitive = false;
 
-    if (favorite_button.active)
-      this.tweet.favorite_count ++;
-    else
-      this.tweet.favorite_count --;
-
     this.update_rt_fav_labels ();
 
     TweetUtils.set_favorite_status.begin (account, tweet, favorite_button.active, () => {
@@ -237,6 +241,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       this.tweet.retweet_count ++;
     else
       this.tweet.retweet_count --;
+
     this.update_rt_fav_labels ();
 
     TweetUtils.set_retweet_status.begin (account, tweet, retweet_button.active, () => {
@@ -269,16 +274,13 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       screen_name = this.tweet.source_tweet.author.screen_name;
     }
 
-    var bundle = new Bundle ();
-    bundle.put_int64 ("user_id", id);
-    bundle.put_string ("screen_name", screen_name);
+    var bundle = new Cb.Bundle ();
+    bundle.put_int64 (ProfilePage.KEY_USER_ID, id);
+    bundle.put_string (ProfilePage.KEY_SCREEN_NAME, screen_name);
     main_window.main_widget.switch_page (Page.PROFILE, bundle);
   }
 
-  /**
-   * Loads the data of the tweet with the id tweet_id from the Twitter server.
-   */
-  private void query_tweet_info (bool existing) { //{{{
+  private void query_tweet_info (bool existing) {
     if (this.cancellable != null) {
       this.cancellable.cancel ();
     }
@@ -291,6 +293,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
     call.set_function ("1.1/statuses/show.json");
     call.add_param ("id", tweet_id.to_string ());
     call.add_param ("include_my_retweet", "true");
+    call.add_param ("tweet_mode", "extended");
     TweetUtils.load_threaded.begin (call, cancellable, (__, res) => {
       Json.Node? root = null;
 
@@ -322,8 +325,12 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
       set_tweet_data (tweet, with);
 
-      if (!existing)
-        load_replied_to_tweet (tweet.reply_id);
+      if (!existing) {
+        if (tweet.retweeted_tweet == null)
+          load_replied_to_tweet (tweet.source_tweet.reply_id);
+        else
+          load_replied_to_tweet (tweet.retweeted_tweet.reply_id);
+      }
 
       values_set = true;
     });
@@ -334,6 +341,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
     reply_call.add_param ("q", "to:" + this.screen_name);
     reply_call.add_param ("since_id", tweet_id.to_string ());
     reply_call.add_param ("count", "200");
+    reply_call.add_param ("tweet_mode", "extended");
     TweetUtils.load_threaded.begin (reply_call, cancellable, (_, res) => {
       Json.Node? root = null;
 
@@ -385,7 +393,7 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
     });
 
-  } //}}}
+  }
 
   /**
    * Loads the tweet this tweet is a reply to.
@@ -403,13 +411,14 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
     call.set_function ("1.1/statuses/show.json");
     call.set_method ("GET");
     call.add_param ("id", reply_id.to_string ());
+    call.add_param ("tweet_mode", "extended");
     call.invoke_async.begin (cancellable, (obj, res) => {
       try {
         call.invoke_async.end (res);
-      }catch (GLib.Error e) {
-        critical(e.message);
+      } catch (GLib.Error e) {
         if (e.message.strip () != "Forbidden" &&
             e.message.strip ().down () != "not found") {
+          critical (e.message);
           Utils.show_error_object (call.get_payload (), e.message,
                                    GLib.Log.LINE, GLib.Log.FILE, this.main_window);
         }
@@ -429,7 +438,10 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       var tweet = new Cb.Tweet ();
       tweet.load_from_json (parser.get_root (), account.id, new GLib.DateTime.now_local ());
       bottom_list_box.model.add (tweet);
-      load_replied_to_tweet (tweet.reply_id);
+      if (tweet.retweeted_tweet == null)
+        load_replied_to_tweet (tweet.source_tweet.reply_id);
+      else
+        load_replied_to_tweet (tweet.retweeted_tweet.reply_id);
     });
   }
 
@@ -449,24 +461,51 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
     text_label.label = tweet.get_formatted_text ();
     name_button.set_markup (tweet.get_user_name ());
     screen_name_label.label = "@" + tweet.get_screen_name ();
-    avatar_image.surface = Twitter.get ().get_avatar (tweet.get_user_id (), tweet.avatar_url, (a) => {
-      avatar_image.surface = a;
-    });
+    Twitter.get ().get_avatar.begin (tweet.get_user_id (), tweet.avatar_url, avatar_image);
     update_rt_fav_labels ();
     time_label.label = time_format;
     retweet_button.active  = tweet.is_flag_set (Cb.TweetState.RETWEETED);
     favorite_button.active = tweet.is_flag_set (Cb.TweetState.FAVORITED);
     avatar_image.verified  = tweet.is_flag_set (Cb.TweetState.VERIFIED);
 
-
     set_source_link (tweet.id, tweet.get_screen_name ());
 
+    if ((tweet.retweeted_tweet != null &&
+         tweet.retweeted_tweet.reply_id != 0) ||
+        tweet.source_tweet.reply_id != 0) {
+      var reply_users = tweet.get_reply_users ();
+      reply_box.show ();
+      var buff = new StringBuilder ();
+      buff.append (_("Replying to"));
+      buff.append_c (' ');
+      Cb.Utils.linkify_user (ref reply_users[0], buff);
+
+      for (int i = 1; i < reply_users.length - 1; i ++) {
+        buff.append (", ");
+        Cb.Utils.linkify_user (ref reply_users[i], buff);
+      }
+
+      if (reply_users.length > 1) {
+        /* Last one */
+        buff.append_c (' ')
+            .append (_("and"))
+            .append_c (' ');
+        Cb.Utils.linkify_user (ref reply_users[reply_users.length - 1], buff);
+      }
+
+      reply_label.label = buff.str;
+    } else {
+      reply_box.hide ();
+    }
+
     if (tweet.has_inline_media ()) {
-      mm_widget.set_all_media (tweet.get_medias ());
       this.mm_widget.visible = (Settings.get_media_visiblity () != MediaVisibility.HIDE);
+      mm_widget.set_all_media (tweet.get_medias ());
     } else {
       mm_widget.hide ();
     }
+
+    ((GLib.SimpleAction)actions.lookup_action ("delete")).set_enabled (tweet.get_user_id () == account.id);
 
     if (tweet.is_flag_set (Cb.TweetState.PROTECTED)) {
       retweet_button.hide ();
@@ -511,11 +550,6 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
     favorite_button.sensitive = false;
 
-    if (favoriting)
-      this.tweet.favorite_count ++;
-    else
-      this.tweet.favorite_count --;
-
     this.update_rt_fav_labels ();
 
     TweetUtils.set_favorite_status.begin (account, tweet, favoriting, () => {
@@ -523,6 +557,17 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
       values_set = false;
       favorite_button.active = favoriting;
       values_set = true;
+    });
+  }
+
+  private void delete_activated () {
+    if (this.tweet == null ||
+        this.tweet.get_user_id () != account.id) {
+      return;
+    }
+
+    this.main_window.main_widget.remove_current_page ();
+    TweetUtils.delete_tweet.begin (account, tweet, () => {
     });
   }
 
@@ -560,19 +605,49 @@ class TweetInfoPage : IPage, ScrollWidget, IMessageReceiver {
 
   public void stream_message_received (StreamMessageType type,
                                        Json.Node         root) {
-    if (type != StreamMessageType.TWEET)
-      return;
+    if (type == StreamMessageType.TWEET) {
+      Json.Object root_obj = root.get_object ();
+      if (Utils.usable_json_value (root_obj, "in_reply_to_status_id")) {
+        int64 reply_id = root_obj.get_int_member ("in_reply_to_status_id");
 
-    Json.Object root_obj = root.get_object ();
-    if (Utils.usable_json_value (root_obj, "in_reply_to_status_id")) {
-      int64 reply_id = root_obj.get_int_member ("in_reply_to_status_id");
+        if (reply_id == this.tweet_id) {
+          var t = new Cb.Tweet ();
+          t.load_from_json (root, account.id, new GLib.DateTime.now_local ());
+          top_list_box.model.add (t);
+          top_list_box.show ();
+          this.reply_indicator.replies_available = true;
+        }
+      }
+    } else if (type == StreamMessageType.DELETE) {
+      int64 tweet_id = root.get_object ().get_object_member ("delete")
+                                         .get_object_member ("status")
+                                         .get_int_member ("id");
+      if (tweet_id == this.tweet_id && main_window.cur_page_id == this.id) {
+        /* TODO: We should probably remove this page with this bundle form the
+                 history, even if it's not the currently visible page */
+        debug ("Current tweet with id %s deleted!", tweet_id.to_string ());
+        this.main_window.main_widget.remove_current_page ();
+      }
+    } else if (type == StreamMessageType.EVENT_FAVORITE) {
+      int64 id = root.get_object ().get_object_member ("target_object").get_int_member ("id");
+      int64 source_id = root.get_object ().get_object_member ("source").get_int_member ("id");
+      if (source_id == account.id && id == this.tweet_id) {
+        this.values_set = false;
+        this.favorite_button.active = true;
+        this.tweet.favorite_count ++;
+        this.update_rt_fav_labels ();
+        this.values_set = true;
+      }
 
-      if (reply_id == this.tweet_id) {
-        var t = new Cb.Tweet ();
-        t.load_from_json (root, account.id, new GLib.DateTime.now_local ());
-        top_list_box.model.add (t);
-        top_list_box.show ();
-        this.reply_indicator.replies_available = true;
+    } else if (type == StreamMessageType.EVENT_UNFAVORITE) {
+      int64 id = root.get_object ().get_object_member ("target_object").get_int_member ("id");
+      int64 source_id = root.get_object ().get_object_member ("source").get_int_member ("id");
+      if (source_id == account.id && id == this.tweet_id) {
+        this.values_set = false;
+        this.favorite_button.active = false;
+        this.tweet.favorite_count --;
+        this.update_rt_fav_labels ();
+        this.values_set = true;
       }
     }
   }

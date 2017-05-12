@@ -23,15 +23,21 @@ class MediaVideoWidget : Gtk.Stack {
 #endif
   private GLib.Cancellable cancellable;
   private Gtk.Label error_label = new Gtk.Label ("");
+  private Gtk.ProgressBar video_progress = new Gtk.ProgressBar ();
+  private uint video_progress_id = 0;
 
   private SurfaceProgress surface_progress;
   private string? media_url = null;
 
   public MediaVideoWidget (Cb.Media media) {
+    GLib.return_val_if_fail (media.surface != null, null);
+
     this.cancellable = new GLib.Cancellable ();
-    assert (media.surface != null);
     var image_surface = (Cairo.ImageSurface) media.surface;
-    this.set_size_request (image_surface.get_width (), image_surface.get_height ());
+    video_progress.show ();
+    int h;
+    video_progress.get_preferred_height (out h, null);
+    this.set_size_request (image_surface.get_width (), image_surface.get_height () + h);
 #if VIDEO
 
     debug ("Media type: %d", media.type);
@@ -41,10 +47,6 @@ class MediaVideoWidget : Gtk.Stack {
       case Cb.MediaType.INSTAGRAM_VIDEO:
         this.media_url = media.url;
         /* Video will be started in init() */
-      break;
-
-      case Cb.MediaType.VINE:
-        fetch_real_url.begin (media.url, "<meta property=\"twitter:player:stream\" content=\"(.*?)\"");
       break;
 
       case Cb.MediaType.ANIMATED_GIF:
@@ -70,21 +72,41 @@ class MediaVideoWidget : Gtk.Stack {
     this.add (surface_progress);
     this.add (error_label);
 
-
     this.visible_child = surface_progress;
+  }
+
+  private bool progress_timeout_cb () {
+#if VIDEO
+    int64 duration_ns;
+    int64 position_ns;
+
+    this.src.query_duration (Gst.Format.TIME, out duration_ns);
+    if (duration_ns > 0) {
+      this.src.query_position (Gst.Format.TIME, out position_ns);
+      double fraction = (double) position_ns / (double) duration_ns;
+      this.video_progress.set_fraction (fraction);
+    }
+#endif
+
+    return GLib.Source.CONTINUE;
+  }
+
+  private void start_progress_timeout () {
+    this.video_progress_id = GLib.Timeout.add (100, progress_timeout_cb);
   }
 
   private void start_video () {
 #if VIDEO
     assert (this.media_url != null);
     this.src.set ("uri", this.media_url);
-    /* We will set it to PLAYING once we hit 100% buffering */
+    /* We will set it to PLAYING once we get an ASYNC_DONE message */
     this.src.set_state (Gst.State.PAUSED);
 #endif
   }
 
   public void init () {
 #if VIDEO
+    var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
     this.src = Gst.ElementFactory.make ("playbin", "video");
     this.sink = Gst.ElementFactory.make ("gtksink", "gtksink");
     if (sink == null) {
@@ -92,10 +114,11 @@ class MediaVideoWidget : Gtk.Stack {
       critical ("Could not create a gtksink. Need gst-plugins-bad >= 1.6");
       return;
     }
-    this.sink.get ("widget", out area);
-    assert (area != null);
-    assert (area is Gtk.DrawingArea);
-    this.add_named (area, "video");
+    this.sink.get ("widget", out this.area);
+    assert (this.area != null);
+    assert (this.area is Gtk.DrawingArea);
+    this.area.hexpand = true;
+    this.area.vexpand = true;
     /* We will switch to the "video" child later after getting
        an ASYNC_DONE message from gstreamer */
 
@@ -107,6 +130,13 @@ class MediaVideoWidget : Gtk.Stack {
     uint flags;
     this.src.get ("flags",  out flags);
     this.src.set ("flags",  flags | (1 << 7)); // (1 << 7) = GST_PLAY_FLAG_DOWNLOAD
+
+
+    box.add (this.area);
+    video_progress.get_style_context ().add_class ("embedded-progress");
+    box.add (this.video_progress);
+
+    this.add_named (box, "video");
 
     if (this.media_url != null) {
       /* Set in constructor */
@@ -121,11 +151,6 @@ class MediaVideoWidget : Gtk.Stack {
     this.visible_child = error_label;
   }
 
-  public override bool button_press_event (Gdk.EventButton evt) {
-    stop ();
-    return Gdk.EVENT_PROPAGATE;
-  }
-
   public override bool key_press_event (Gdk.EventKey evt) {
     stop ();
     return Gdk.EVENT_STOP;
@@ -133,6 +158,10 @@ class MediaVideoWidget : Gtk.Stack {
 
   private void stop () {
     cancellable.cancel ();
+    if (video_progress_id != 0) {
+      GLib.Source.remove (video_progress_id);
+      video_progress_id = 0;
+    }
 #if VIDEO
     src.set_state (Gst.State.NULL);
 #endif
@@ -151,10 +180,6 @@ class MediaVideoWidget : Gtk.Stack {
         msg.parse_buffering (out percent);
         debug ("Buffering: %d%%", percent);
         this.surface_progress.progress = double.max (percent / 100.0, this.surface_progress.progress);
-        if (percent == 100) {
-          debug ("Playing...");
-          this.src.set_state (Gst.State.PLAYING);
-        }
       break;
 
       case Gst.MessageType.EOS:
@@ -166,6 +191,8 @@ class MediaVideoWidget : Gtk.Stack {
       case Gst.MessageType.ASYNC_DONE:
         debug ("ASYNC DONE");
         this.visible_child_name = "video";
+        start_progress_timeout ();
+        this.src.set_state (Gst.State.PLAYING);
       break;
 
       case Gst.MessageType.ERROR:
@@ -173,7 +200,7 @@ class MediaVideoWidget : Gtk.Stack {
         string debug;
         msg.parse_error (out error, out debug);
         show_error (debug);
-        critical (error.message);
+        critical ("%s: %s", error.message, debug);
       break;
     }
 

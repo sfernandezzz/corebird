@@ -16,7 +16,7 @@
  */
 
 [GtkTemplate (ui = "/org/baedert/corebird/ui/dm-list-entry.ui")]
-class DMListEntry : Gtk.ListBoxRow, ITwitterItem {
+class DMListEntry : Gtk.ListBoxRow, Cb.TwitterItem {
   [GtkChild]
   private AvatarWidget avatar_image;
   [GtkChild]
@@ -47,10 +47,7 @@ class DMListEntry : Gtk.ListBoxRow, ITwitterItem {
     set {}
   }
 
-  public int64 sort_factor {
-    get { return timestamp; }
-  }
-
+  private GLib.TimeSpan last_timediff;
   public int64 timestamp;
   public int64 id;
   public int64 user_id;
@@ -58,9 +55,9 @@ class DMListEntry : Gtk.ListBoxRow, ITwitterItem {
 
   public DMListEntry () {
     name_button.clicked.connect (() => {
-      var bundle = new Bundle ();
-      bundle.put_int64 ("user_id", user_id);
-      bundle.put_string ("screen_name", screen_name_label.label.substring (1));
+      var bundle = new Cb.Bundle ();
+      bundle.put_int64 (ProfilePage.KEY_USER_ID, user_id);
+      bundle.put_string (ProfilePage.KEY_SCREEN_NAME, screen_name_label.label.substring (1));
       main_window.main_widget.switch_page (Page.PROFILE, bundle);
     });
   }
@@ -70,9 +67,7 @@ class DMListEntry : Gtk.ListBoxRow, ITwitterItem {
     if (this.get_scale_factor () == 2)
       url = url.replace ("_normal", "_bigger");
 
-    avatar_image.surface = Twitter.get ().get_avatar (user_id, url, (a) => {
-      avatar_image.surface = a;
-    }, 48 * this.get_scale_factor ());
+    Twitter.get ().get_avatar.begin (user_id, url, avatar_image, 48 * this.get_scale_factor ());
   }
 
   public int update_time_delta (GLib.DateTime? now = null) {
@@ -85,6 +80,22 @@ class DMListEntry : Gtk.ListBoxRow, ITwitterItem {
     GLib.DateTime then = new GLib.DateTime.from_unix_local (timestamp);
     time_delta_label.label = Utils.get_time_delta (then, cur_time);
     return (int)(cur_time.difference (then) / 1000.0 / 1000.0);
+  }
+
+  public int64 get_sort_factor () {
+    return timestamp;
+  }
+
+  public int64 get_timestamp () {
+    return timestamp;
+  }
+
+  public GLib.TimeSpan get_last_set_timediff () {
+    return this.last_timediff;
+  }
+
+  public void set_last_set_timediff (GLib.TimeSpan span) {
+    this.last_timediff = span;
   }
 }
 

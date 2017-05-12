@@ -18,12 +18,37 @@
 class ComposeImageManager : Gtk.Container {
   private const int BUTTON_DELTA = 10;
   private const int BUTTON_SPACING = 12;
+  private bool _upload_started = false;
   private GLib.GenericArray<AddImageButton> buttons;
   private GLib.GenericArray<Gtk.Button> close_buttons;
+  private GLib.GenericArray<Gtk.ProgressBar> progress_bars;
 
   public int n_images {
     get {
       return this.buttons.length;
+    }
+  }
+  public bool upload_started {
+    set {
+      this._upload_started = value;
+      this.queue_draw ();
+    }
+  }
+  public bool has_gif {
+    get {
+      for (int i = 0; i < buttons.length; i ++) {
+        if (buttons.get (i).image_path.has_suffix (".gif")) {
+          return true;
+        }
+      }
+      return false;
+
+    }
+  }
+  public bool full {
+    get {
+      return this.buttons.length == Twitter.max_media_per_upload ||
+             this.has_gif;
     }
   }
 
@@ -32,6 +57,7 @@ class ComposeImageManager : Gtk.Container {
   construct {
     this.buttons = new GLib.GenericArray<AddImageButton> ();
     this.close_buttons = new GLib.GenericArray<Gtk.Button> ();
+    this.progress_bars = new GLib.GenericArray<Gtk.ProgressBar> ();
     this.set_has_window (false);
   }
 
@@ -47,11 +73,13 @@ class ComposeImageManager : Gtk.Container {
     assert (index >= 0);
 
     this.close_buttons.get (index).hide ();
+    this.progress_bars.get (index).hide ();
 
     AddImageButton aib = (AddImageButton) this.buttons.get (index);
     aib.deleted.connect (() => {
       this.buttons.remove_index (index);
       this.close_buttons.remove_index (index);
+      this.progress_bars.remove_index (index);
       this.image_removed ();
       this.queue_draw ();
     });
@@ -62,10 +90,25 @@ class ComposeImageManager : Gtk.Container {
   // GtkContainer API {{{
   public override void forall_internal (bool include_internals, Gtk.Callback cb) {
     assert (buttons.length == close_buttons.length);
-    for (int i = 0; i < this.buttons.length; i ++) {
+    assert (buttons.length == progress_bars.length);
+
+    for (int i = 0; i < this.close_buttons.length;) {
+      int size_before = this.close_buttons.length;
+      cb (close_buttons.get (i));
+
+      i += this.close_buttons.length - size_before + 1;
+    }
+
+    for (int i = 0; i < this.progress_bars.length;) {
+      int size_before = this.progress_bars.length;
+      cb (progress_bars.get (i));
+
+      i += this.progress_bars.length - size_before + 1;
+    }
+
+    for (int i = 0; i < this.buttons.length;) {
       int size_before = this.buttons.length;
       cb (buttons.get (i));
-      cb (close_buttons.get (i));
 
       i += this.buttons.length - size_before + 1;
     }
@@ -73,7 +116,6 @@ class ComposeImageManager : Gtk.Container {
 
   public override void add (Gtk.Widget widget) {
     widget.set_parent (this);
-    widget.set_parent_window (this.get_window ());
     this.buttons.add ((AddImageButton)widget);
     var btn = new Gtk.Button.from_icon_name ("window-close-symbolic");
     btn.set_parent (this);
@@ -82,14 +124,21 @@ class ComposeImageManager : Gtk.Container {
     btn.clicked.connect (remove_clicked_cb);
     btn.show ();
     this.close_buttons.add (btn);
+
+    var bar = new Gtk.ProgressBar ();
+    bar.set_parent (this);
+    bar.show ();
+    this.progress_bars.add (bar);
   }
 
   public override void remove (Gtk.Widget widget) {
     widget.unparent ();
     if (widget is AddImageButton)
       this.buttons.remove ((AddImageButton)widget);
-    else
+    else if (widget is Gtk.Button)
       this.close_buttons.remove ((Gtk.Button)widget);
+    else
+      this.progress_bars.remove ((Gtk.ProgressBar)widget);
   }
   // }}}
 
@@ -117,6 +166,7 @@ class ComposeImageManager : Gtk.Container {
     for (int i = 0, p = this.buttons.length; i < p; i ++) {
       int min, nat;
 
+      /* Actual image button */
       AddImageButton aib = this.buttons.get (i);
       aib.get_preferred_width_for_height (child_allocation.height, out min, out nat);
 
@@ -124,6 +174,7 @@ class ComposeImageManager : Gtk.Container {
       aib.size_allocate (child_allocation);
 
 
+      /* Remove button */
       int n;
       Gtk.Widget btn = this.close_buttons.get (i);
       btn.get_preferred_width (out close_allocation.width, out n);
@@ -132,6 +183,21 @@ class ComposeImageManager : Gtk.Container {
                            - close_allocation.width + BUTTON_DELTA;
 
       btn.size_allocate (close_allocation);
+
+
+      /* Progress bar */
+      int button_width, button_height;
+      double scale;
+      aib.get_draw_size (out button_width, out button_height, out scale);
+      Gtk.Widget bar = this.progress_bars.get (i);
+      Gtk.Allocation bar_allocation = {0};
+      bar_allocation.x = child_allocation.x + 6;
+      bar.get_preferred_width (out bar_allocation.width, out n);
+      bar_allocation.width = int.max (button_width - 12, bar_allocation.width);
+      bar.get_preferred_height (out bar_allocation.height, out n);
+      bar_allocation.y = child_allocation.y + button_height - bar_allocation.height - 6;
+
+      bar.size_allocate (bar_allocation);
 
       child_allocation.x += child_allocation.width + BUTTON_SPACING;
     }
@@ -199,11 +265,24 @@ class ComposeImageManager : Gtk.Container {
       this.propagate_draw (btn, ct);
     }
 
+#if REST081
+    if (_upload_started) {
+      for (int i = 0, p = this.progress_bars.length; i < p; i ++) {
+        var bar = this.progress_bars.get (i);
+        this.propagate_draw (bar, ct);
+      }
+    }
+#endif
+
     return Gdk.EVENT_PROPAGATE;
   }
   // }}}
 
   public void load_image (string path, Gdk.Pixbuf? image) {
+#if DEBUG
+    assert (!this.full);
+#endif
+
     Cairo.ImageSurface surface;
     if (image == null)
       surface = (Cairo.ImageSurface) load_surface (path);
@@ -238,6 +317,17 @@ class ComposeImageManager : Gtk.Container {
       var btn = buttons.get (i);
       if (btn.image_path == image_path) {
         btn.get_style_context ().add_class ("image-progress");
+        break;
+      }
+    }
+  }
+
+  public void set_image_progress (string image_path, double progress) {
+    for (int i = 0; i < buttons.length; i ++) {
+      var btn = buttons.get (i);
+      if (btn.image_path == image_path) {
+        var progress_bar = progress_bars.get (i);
+        progress_bar.set_fraction (progress);
         break;
       }
     }
